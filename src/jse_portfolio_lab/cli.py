@@ -2,9 +2,11 @@
 Command-line interface for JSE Portfolio Optimizer.
 """
 
+import json
 import os
 import pickle
 from datetime import datetime
+from pathlib import Path
 from typing import Dict
 
 import click
@@ -22,7 +24,7 @@ from .optimization import (
 )
 from .backtesting import Backtest
 from .metrics import PerformanceMetrics
-from .utils import Visualizer, load_config
+from .utils import Visualizer, load_config, update_readme
 
 
 def create_optimizer(method_config: Dict, constraints: Dict):
@@ -142,11 +144,36 @@ def main(config: str, use_cache: bool, verbose: bool):
     # Get clean benchmark returns from factors
     benchmark_returns = factors['benchmark']
     
+    available_per_date = returns.notna().sum(axis=1)
+    n_tickers_configured = len(cfg['data']['tickers'])
+    n_tickers_loaded = len(returns.columns)
+    universe_meta = {
+        'tickers_configured': n_tickers_configured,
+        'tickers_loaded': n_tickers_loaded,
+        'availability_min': int(available_per_date.min()),
+        'availability_max': int(available_per_date.max()),
+        'availability_mean': float(available_per_date.mean()),
+        'data_start': str(returns.index[0].date()),
+        'data_end': str(returns.index[-1].date()),
+        'n_trading_days': int(len(returns)),
+        'annualisation': (
+            '(1+r).prod()**(252/n)-1 on evaluation-window daily returns'
+        ),
+    }
+
     if verbose:
         click.echo(f"\nDataset summary:")
         click.echo(f"  Date range: {returns.index[0].date()} to {returns.index[-1].date()}")
         click.echo(f"  Trading days: {len(returns)}")
-        click.echo(f"  Stocks: {len(returns.columns)}")
+        click.echo(
+            f"  Tickers configured: {n_tickers_configured}; "
+            f"loaded after quality filters: {n_tickers_loaded}"
+        )
+        click.echo(
+            f"  Available per day: {universe_meta['availability_min']}-"
+            f"{universe_meta['availability_max']} "
+            f"(avg {universe_meta['availability_mean']:.1f})"
+        )
         click.echo(f"  Tickers: {', '.join(returns.columns[:10].tolist())}...")
     
     # Run backtests
@@ -269,6 +296,27 @@ def main(config: str, use_cache: bool, verbose: bool):
     
     # Save metrics table
     metrics_df.to_csv(os.path.join(results_dir, 'metrics.csv'))
+
+    universe_meta['evaluation_start'] = str(pd.Timestamp(evaluation_start_date).date())
+    universe_meta['evaluation_end'] = str(returns.index[-1].date())
+    metadata_path = os.path.join(results_dir, 'run_metadata.json')
+    with open(metadata_path, 'w') as f:
+        json.dump(universe_meta, f, indent=2)
+
+    # Keep README numbers in lockstep with metrics.csv
+    readme_path = Path('README.md')
+    if readme_path.exists():
+        try:
+            update_readme(
+                readme_path,
+                Path(results_dir) / 'metrics.csv',
+                Path(metadata_path),
+            )
+            if verbose:
+                click.echo("Updated README.md metric sections from reports/metrics.csv")
+        except ValueError as exc:
+            if verbose:
+                click.echo(f"Warning: could not sync README.md: {exc}")
     
     # Save benchmark data for reproducibility
     benchmark_df = pd.DataFrame({

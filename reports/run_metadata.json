@@ -1,0 +1,13 @@
+{
+  "tickers_configured": 35,
+  "tickers_loaded": 31,
+  "availability_min": 25,
+  "availability_max": 31,
+  "availability_mean": 27.5,
+  "data_start": "2010-01-04",
+  "data_end": "2026-10-30",
+  "n_trading_days": 4289,
+  "evaluation_start": "2010-12-31",
+  "evaluation_end": "2026-10-30",
+  "annualisation": "(1+r).prod()**(252/n)-1 on evaluation-window daily returns"
+}
