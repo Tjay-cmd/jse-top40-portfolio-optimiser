@@ -195,26 +195,20 @@ class Backtest:
                     daily_return = returns.iloc[j]
                     portfolio_return = (current_weights * daily_return).sum()
                     
-                    # Update value (can't go below 0 for long-only)
+                    # Update value
                     current_value *= (1 + portfolio_return)
-                    if current_value < 0:
-                        current_value = 0  # Wipeout - portfolio worth nothing
                     portfolio_value[date] = current_value
                     
                     # Update weights due to price changes (drift)
-                    # Clip returns to prevent data errors from causing negative weights
-                    daily_return_clipped = daily_return.clip(lower=-0.95, upper=3.0)
-                    current_weights = current_weights * (1 + daily_return_clipped)
+                    current_weights = current_weights * (1 + daily_return)
                     
-                    # Remove negative weights (shouldn't happen but safety check)
-                    current_weights = current_weights.clip(lower=0)
-                    
-                    # Renormalize (handle case where all weights are zero)
+                    # Renormalize
                     weight_sum = current_weights.sum()
                     if weight_sum > 1e-10:
                         current_weights = current_weights / weight_sum
                     else:
-                        # Portfolio wiped out, set to equal weight of remaining value
+                        # All positions wiped out (shouldn't happen with clean data)
+                        print(f"Warning: All positions wiped out on {date}")
                         current_weights = pd.Series(
                             1.0 / len(current_weights),
                             index=current_weights.index

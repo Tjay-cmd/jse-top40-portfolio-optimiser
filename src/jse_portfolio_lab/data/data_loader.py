@@ -12,6 +12,8 @@ import yfinance as yf
 from pandas_datareader import data as pdr
 from tqdm import tqdm
 
+from .cleaner import JSEDataCleaner
+
 
 class DataLoader:
     """Load and cache market data from yfinance and FRED."""
@@ -27,6 +29,7 @@ class DataLoader:
         """
         self.cache_dir = cache_dir
         os.makedirs(cache_dir, exist_ok=True)
+        self.cleaner = JSEDataCleaner()
         
     def _get_cache_path(self, key: str) -> str:
         """Get cache file path for a given key."""
@@ -129,12 +132,23 @@ class DataLoader:
                 elif isinstance(data, pd.Series):
                     close_data = data
                 
-                # Validate the data
+                # Validate and clean the data
                 if close_data is not None:
                     # Ensure it's a series
                     if isinstance(close_data, pd.Series):
                         if len(close_data) >= min_data_points:
-                            prices_dict[ticker] = close_data
+                            # Clean JSE data (fix unit jumps, etc.)
+                            clean_data, stats = self.cleaner.clean_series(
+                                close_data, 
+                                ticker,
+                                verbose=False
+                            )
+                            
+                            # Verify quality after cleaning
+                            if stats.get('annual_vol', 0) < 1.5 and stats.get('max_daily_return', 0) < 0.50:
+                                prices_dict[ticker] = clean_data
+                            else:
+                                print(f"Warning: {ticker} failed quality check after cleaning (vol={stats.get('annual_vol', 0):.1%})")
                         else:
                             print(f"Warning: Insufficient data for {ticker} ({len(close_data)} points, need {min_data_points})")
                     elif isinstance(close_data, (int, float)):

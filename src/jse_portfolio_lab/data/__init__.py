@@ -2,5 +2,6 @@
 
 from .data_loader import DataLoader
 from .preprocessor import DataPreprocessor
+from .cleaner import JSEDataCleaner
 
-__all__ = ["DataLoader", "DataPreprocessor"]
+__all__ = ["DataLoader", "DataPreprocessor", "JSEDataCleaner"]

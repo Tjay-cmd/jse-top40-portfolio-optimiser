@@ -51,8 +51,8 @@ data:
   end_date: null  # null = today
   
   # Data handling
-  min_trading_days: 500  # Minimum trading days required for inclusion
-  price_scale: 100  # JSE prices in cents, divide by 100
+  min_trading_days: 252  # Minimum trading days required for inclusion (1 year)
+  price_scale: 100  # JSE prices in cents (handled by cleaner)
   
   cache_dir: data/cache
 

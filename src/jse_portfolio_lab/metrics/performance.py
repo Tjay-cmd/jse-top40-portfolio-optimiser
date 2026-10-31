@@ -194,12 +194,11 @@ class PerformanceMetrics:
         drawdown = (cumulative - running_max) / running_max
         max_dd = abs(drawdown.min())
         
-        # Sanity check: drawdown can't exceed 100% for long-only
+        # Sanity check: drawdown should not exceed 100% for long-only
         if max_dd > 1.0:
-            print(f"Warning: Max drawdown {max_dd:.2%} exceeds 100%, capping at 100%")
-            max_dd = 1.0
+            print(f"ERROR: Max drawdown {max_dd:.2%} exceeds 100% - data quality issue!")
         
-        return max_dd
+        return min(max_dd, 1.0)  # Cap at 100% as mathematical limit
     
     def calmar_ratio(self, returns: pd.Series) -> float:
         """
