@@ -31,7 +31,8 @@ class DataPreprocessor:
     
     def filter_liquid_stocks(self, prices: pd.DataFrame) -> pd.DataFrame:
         """
-        Filter stocks with sufficient trading history.
+        Keep all stocks with any data (unbalanced panel support).
+        Individual rebalances will check for sufficient history.
         
         Parameters
         ----------
@@ -41,14 +42,13 @@ class DataPreprocessor:
         Returns
         -------
         pd.DataFrame
-            Filtered prices
+            Prices (may have NaNs for late-listed stocks)
         """
-        valid_counts = prices.notna().sum()
-        liquid_tickers = valid_counts[valid_counts >= self.min_trading_days].index.tolist()
+        # Don't filter here - allow unbalanced panel
+        # Each stock will be included once it has min_trading_days of history
+        print(f"Keeping all {len(prices.columns)} stocks (unbalanced panel)")
         
-        print(f"Filtered to {len(liquid_tickers)}/{len(prices.columns)} liquid stocks")
-        
-        return prices[liquid_tickers]
+        return prices
     
     def handle_missing_data(self, prices: pd.DataFrame) -> pd.DataFrame:
         """
@@ -94,7 +94,7 @@ class DataPreprocessor:
     
     def compute_returns(self, prices: pd.DataFrame) -> pd.DataFrame:
         """
-        Compute simple returns from prices (not log returns for easier interpretation).
+        Compute simple returns from prices (preserves NaNs for unbalanced panel).
         
         Parameters
         ----------
@@ -104,10 +104,12 @@ class DataPreprocessor:
         Returns
         -------
         pd.DataFrame
-            Simple returns
+            Simple returns (may contain NaNs where stocks haven't listed yet)
         """
         returns = prices.pct_change()
-        returns = returns.dropna()
+        
+        # Don't dropna() - preserve NaNs for unbalanced panel
+        # Each stock's returns start when that stock has data
         
         # Sanity check: after cleaning, no single return should exceed ±40%
         extreme = (returns.abs() > 0.40).sum().sum()
@@ -184,8 +186,7 @@ class DataPreprocessor:
         # Filter liquid stocks
         prices = self.filter_liquid_stocks(raw_data['prices'])
         
-        # Handle missing data
-        prices = self.handle_missing_data(prices)
+        # No additional filtering - preserve NaNs for unbalanced panel
         
         # Scale prices (JSE prices in cents)
         # Note: Some tickers may already be in correct scale, but dividing by 100
@@ -207,8 +208,23 @@ class DataPreprocessor:
             raw_data.get('rf_rate')
         )
         
-        # Compute returns
+        # Compute returns (preserves NaNs for unbalanced panel - each stock starts when it has data)
         returns = self.compute_returns(aligned['prices'])
+        
+        # Remove first row (all NaN from pct_change)
+        returns = returns.iloc[1:]
+        prices_trimmed = aligned['prices'].iloc[1:]
+        
+        # Compute factor returns  
+        benchmark_returns = aligned['benchmark'].pct_change().iloc[1:]
+        fx_returns = aligned['fx'].pct_change().iloc[1:] if aligned['fx'] is not None else None
+        
+        # Build factors dict
+        factors = {
+            'benchmark': benchmark_returns,
+            'fx': fx_returns,
+            'risk_free_rate': aligned['rf_rate'].iloc[1:] if aligned['rf_rate'] is not None else None,
+        }
         
         # Compute factor returns
         factors = {}
@@ -219,13 +235,10 @@ class DataPreprocessor:
             # Convert annual yield to daily rate
             factors['rf_rate'] = aligned['rf_rate'] / 252 / 100
         
-        # Align returns and factors
-        common_dates = returns.index.intersection(factors['benchmark'].index)
-        returns = returns.loc[common_dates]
-        for key in factors:
-            if factors[key] is not None:
-                factors[key] = factors[key].reindex(common_dates, method='ffill')
+        # Report stock availability over time
+        available_per_date = returns.notna().sum(axis=1)
+        print(f"Final dataset: {len(returns)} days, {len(returns.columns)} stocks total")
+        print(f"  Stock availability: {available_per_date.min()}-{available_per_date.max()} per day (avg {available_per_date.mean():.1f})")
+        print(f"  Date range: {returns.index.min().date()} to {returns.index.max().date()}")
         
-        print(f"Final dataset: {len(returns)} days, {len(returns.columns)} stocks")
-        
-        return aligned['prices'].loc[returns.index], returns, factors
+        return prices_trimmed, returns, factors

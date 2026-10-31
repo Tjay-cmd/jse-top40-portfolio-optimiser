@@ -151,13 +151,29 @@ class Backtest:
             if len(hist_returns) < self.min_history_days:
                 continue
             
+            # Filter to stocks with sufficient history at this rebalance date
+            # Count non-NaN returns for each stock up to this point
+            available_stocks = (hist_returns.notna().sum() >= self.min_history_days)
+            available_tickers = hist_returns.columns[available_stocks].tolist()
+            
+            if len(available_tickers) < 5:
+                # Too few stocks available, skip this rebalance
+                continue
+            
+            # Use only stocks with sufficient history
+            hist_returns_available = hist_returns[available_tickers].dropna()
+            
             # Optimize portfolio
             try:
-                new_weights = self.optimizer.optimize(hist_returns)
+                new_weights_available = self.optimizer.optimize(hist_returns_available)
+                
+                # Expand to full universe (zero weight for unavailable stocks)
+                new_weights = pd.Series(0.0, index=returns.columns)
+                new_weights[new_weights_available.index] = new_weights_available
             except Exception as e:
                 if verbose:
                     print(f"Optimization failed at {rebalance_date}: {e}")
-                # Keep current weights
+                # Keep current weights (adjusted for available stocks)
                 new_weights = current_weights
             
             # Compute turnover
