@@ -102,16 +102,17 @@ class PerformanceMetrics:
         kurtosis: Optional[float] = None
     ) -> float:
         """
-        Compute Deflated Sharpe Ratio (Bailey and Lopez de Prado, 2012).
+        Compute Deflated Sharpe Ratio (Bailey and Lopez de Prado, 2014).
         
         Adjusts Sharpe ratio for multiple testing and non-normality.
+        Uses per-period (daily) Sharpe ratio as in the original paper.
         
         Parameters
         ----------
         returns : pd.Series
             Daily returns
         n_trials : int
-            Number of strategies tested
+            Number of strategies tested (including variations)
         skew : Optional[float]
             Skewness of returns
         kurtosis : Optional[float]
@@ -120,25 +121,37 @@ class PerformanceMetrics:
         Returns
         -------
         float
-            Deflated Sharpe ratio (probability that SR > 0)
+            Deflated Sharpe ratio (probability that true SR > 0)
         """
-        sharpe = self.sharpe_ratio(returns)
+        # Compute per-period (daily) Sharpe ratio, not annualized
+        daily_rf = self.risk_free_rate / 252
+        excess_returns = returns - daily_rf
+        
+        if excess_returns.std() == 0:
+            return 0.0
+        
+        sr_daily = excess_returns.mean() / excess_returns.std()
         
         if skew is None:
             skew = returns.skew()
         if kurtosis is None:
             kurtosis = returns.kurtosis()
         
-        n = len(returns)
+        T = len(returns)  # Number of observations
         
-        # Expected maximum Sharpe under null
-        sr_0 = np.sqrt((1 / 252) * np.log(n_trials))
+        # Expected maximum Sharpe under null hypothesis (Bailey & López de Prado, 2014)
+        # SR_0 ≈ sqrt((1/T) * ln(N))
+        sr_0 = np.sqrt((1 / T) * np.log(n_trials))
         
-        # Variance of Sharpe estimator
-        var_sr = (1 + 0.5 * sharpe**2 - skew * sharpe + (kurtosis / 4) * sharpe**2) / (n - 1)
+        # Variance of Sharpe ratio estimator (Bailey & López de Prado, 2014, Eq. 6)
+        # Var[SR] = (1/T) * [1 + 0.5*SR^2 - skew*SR + (kurt/4)*SR^2]
+        var_sr = (1 / T) * (1 + 0.5 * sr_daily**2 - skew * sr_daily + (kurtosis / 4) * sr_daily**2)
         
-        # Deflated Sharpe
-        dsr = stats.norm.cdf((sharpe - sr_0) / np.sqrt(var_sr))
+        if var_sr <= 0:
+            return 0.0
+        
+        # Deflated Sharpe: Φ((SR - SR_0) / sqrt(Var[SR]))
+        dsr = stats.norm.cdf((sr_daily - sr_0) / np.sqrt(var_sr))
         
         return dsr
     
@@ -305,7 +318,8 @@ class PerformanceMetrics:
         self,
         returns: pd.Series,
         benchmark_returns: Optional[pd.Series] = None,
-        turnover: Optional[pd.Series] = None
+        turnover: Optional[pd.Series] = None,
+        n_trials: int = 1
     ) -> Dict[str, float]:
         """
         Compute all performance metrics.
@@ -318,6 +332,8 @@ class PerformanceMetrics:
             Benchmark returns
         turnover : Optional[pd.Series]
             Turnover series
+        n_trials : int
+            Number of strategies tested (for Deflated Sharpe Ratio)
             
         Returns
         -------
@@ -328,7 +344,7 @@ class PerformanceMetrics:
             'Annualized Return': self.annualized_return(returns),
             'Annualized Volatility': self.annualized_volatility(returns),
             'Sharpe Ratio': self.sharpe_ratio(returns),
-            'Deflated Sharpe Ratio': self.deflated_sharpe_ratio(returns, n_trials=7),
+            'Deflated Sharpe Ratio': self.deflated_sharpe_ratio(returns, n_trials=n_trials),
             'Sortino Ratio': self.sortino_ratio(returns),
             'Max Drawdown': self.max_drawdown(returns),
             'Calmar Ratio': self.calmar_ratio(returns),

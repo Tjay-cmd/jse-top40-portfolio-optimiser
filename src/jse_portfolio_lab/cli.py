@@ -190,18 +190,25 @@ def main(config: str, use_cache: bool, verbose: bool):
     
     metrics_calc = PerformanceMetrics(risk_free_rate=cfg['risk_free_rate'])
     
+    # Number of strategies tested (for Deflated Sharpe Ratio)
+    n_trials = len(results)
+    
     # Compute portfolio metrics (benchmark_returns already set from preprocessor)
     for method_name, result in results.items():
         metrics = metrics_calc.compute_all_metrics(
             result.returns,
             benchmark_returns=benchmark_returns,
-            turnover=result.turnover
+            turnover=result.turnover,
+            n_trials=n_trials
         )
         metrics['Method'] = method_name
         metrics_list.append(metrics)
     
-    # Add benchmark metrics
-    benchmark_metrics = metrics_calc.compute_all_metrics(benchmark_returns)
+    # Add benchmark metrics (not counted in n_trials as it's not optimized)
+    benchmark_metrics = metrics_calc.compute_all_metrics(
+        benchmark_returns,
+        n_trials=n_trials
+    )
     benchmark_metrics['Method'] = 'STX40 (Benchmark)'
     benchmark_metrics['Avg Turnover'] = 0.0  # Index doesn't rebalance
     metrics_list.append(benchmark_metrics)

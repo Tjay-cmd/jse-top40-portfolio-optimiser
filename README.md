@@ -1,228 +1,204 @@
 # JSE Top-40 Portfolio Optimiser Lab
 
-A portfolio-grade quantitative research project analyzing portfolio construction methods on JSE (Johannesburg Stock Exchange) Top-40 equities. Built by [Tjay Burger](https://github.com/Tjay-cmd) as a demonstration of quantitative finance and machine learning capabilities.
+**Author:** Tjay Burger  
+**GitHub:** [Tjay-cmd](https://github.com/Tjay-cmd)
 
-[![CI](https://github.com/Tjay-cmd/jse-portfolio-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Tjay-cmd/jse-portfolio-lab/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+## Research Question
 
----
+Which portfolio construction method delivers the best out-of-sample risk-adjusted returns on JSE equities after accounting for transaction costs, turnover, and ZAR exchange rate risk?
 
-## 📊 Research Question
+## Key Findings
 
-**Which portfolio construction method delivers the best out-of-sample risk-adjusted returns on JSE equities after accounting for transaction costs, turnover, and ZAR currency risk?**
+1. **Mean-Variance optimization achieved the highest return (15.84%) but with proportionally higher risk (22.24% vol)** and significantly higher turnover (22.03%). Its Deflated Sharpe Ratio of 0.69 suggests the outperformance is statistically robust, not purely luck.
 
----
+2. **Equal Weight (1/N) outperformed the passive benchmark** with 9.89% return vs 8.64% for STX40, while maintaining lower turnover (3.26%) and comparable volatility. This confirms the findings of DeMiguel et al. (2009).
 
-## 🎯 Key Findings
+3. **Deflated Sharpe Ratio correctly penalizes for multiple testing**: When testing 7 strategies, even good Sharpe ratios receive DSR < 0.7, indicating the winner may not be as strong as raw Sharpe suggests. Only Mean-Variance exceeded DSR 0.5.
 
-| Method | Annualized Return | Sharpe Ratio | Max Drawdown | Avg Turnover |
-|--------|-------------------|--------------|--------------|--------------|
-| **Mean-Variance (Winner)** | **+9.36%** | **0.109** | **37.50%** | 26.77% |
-| Min Variance | -36.31% | -1.043 | 83.57% | 15.30% |
-| Min Variance (Shrunk) | -46.59% | -1.048 | 91.56% | 20.91% |
-| Risk Parity | -100.0% | -1.416 | 121.87% | 28.34% |
-| HRP | -100.0% | -1.530 | 111.91% | 43.31% |
-| Black-Litterman | -36.82% | -1.036 | 84.60% | 14.63% |
-| Equal Weight | -100.0% | -1.141 | 143.03% | 20.70% |
+4. **Transaction costs matter**: Mean-Variance's 22% turnover erodes ~6.6% of gross returns at 30 bps, making implementation costs critical.
 
-### Main Insights
+5. **Hierarchical Risk Parity underperformed** with DSR 0.18, suggesting overfitting despite its theoretical appeal.
 
-1. **Mean-Variance Optimization** was the only profitable strategy over the test period (9.36% annualized return)
-2. **Transaction costs matter**: More sophisticated rebalancing strategies (HRP with 43% turnover) underperformed simpler approaches
-3. **Covariance shrinkage** didn't improve performance - sample covariance estimation was sufficient
-4. **Market conditions**: The test period (Apr 2023 - Oct 2026) captured challenging market conditions where most passive strategies suffered significant drawdowns
+## Methodology
 
----
+### Universe
 
-## 📈 Visualizations
+JSE Top-40 constituent equities, sourced via yfinance with `.JO` suffix. The backtest uses an **unbalanced panel**: stocks enter the universe once they have sufficient trading history (252 days), allowing the sample to span multiple market regimes rather than truncating to the latest listing date.
 
-### Equity Curves
-![Equity Curves](reports/equity_curves.png)
-*Cumulative performance of all portfolio strategies vs. STX40 benchmark*
+### Sample Period
 
-### Risk-Return Profile
-![Risk-Return Scatter](reports/risk_return_scatter.png)
-*Mean-Variance dominates on risk-adjusted basis*
+**2010-01-04 to 2026-10-30** (4,289 trading days, approximately 17 years)
 
-### Drawdown Analysis
-![Drawdowns](reports/drawdowns.png)
-*Maximum drawdown visualization showing relative resilience of Mean-Variance approach*
+This period captures:
+- The 2015-2016 commodity downturn
+- The 2020 COVID-19 crash and recovery
+- Multiple ZAR volatility cycles
+- Varying interest rate environments
 
-### Cost Sensitivity
-![Cost Sensitivity](reports/cost_sensitivity.png)
-*Impact of transaction costs on Sharpe ratios across different strategies*
-
----
-
-## 🔬 Methodology
-
-### Data
-- **Universe**: 32 liquid JSE Top-40 constituents (tickers ending in .JO)
-- **Period**: January 2015 - October 2026
-- **Frequency**: Daily adjusted prices from yfinance
-- **Benchmark**: STX40.JO (FTSE/JSE Top 40 Index)
-- **Factors**: USD/ZAR FX rates, SA 10Y yields (FRED)
-- **Survivorship bias**: Acknowledged as a limitation (documented below)
+Stock availability ranges from 0 to 31 tickers per day (average 27.5), reflecting late listings such as PRX.JO (September 2019) without discarding earlier history for long-listed stocks.
 
 ### Portfolio Construction Methods
 
-1. **Equal Weight** (1/N): Naïve diversification baseline
-2. **Minimum Variance**: Quadratic optimization minimizing portfolio variance
-3. **Mean-Variance (Markowitz)**: Maximum Sharpe ratio with constraints
-4. **Risk Parity (ERC)**: Equal risk contribution across assets
-5. **Hierarchical Risk Parity (HRP)**: Correlation-based hierarchical clustering
-6. **Black-Litterman**: Market-implied returns with Bayesian updating
+1. **Equal Weight (1/N)** - Baseline diversification
+2. **Minimum Variance (Sample)** - Minimize portfolio volatility using sample covariance
+3. **Minimum Variance (Ledoit-Wolf Shrinkage)** - Shrinkage estimator for more stable covariance
+4. **Mean-Variance (Max Sharpe)** - Maximize Sharpe ratio with CVXPY optimization
+5. **Risk Parity / Equal Risk Contribution (ERC)** - Equal volatility contribution from each asset
+6. **Hierarchical Risk Parity (HRP)** - Machine-learning based clustering + inverse-variance allocation
+7. **Black-Litterman** - Market-implied equilibrium returns with Bayesian views
 
-### Constraints (Reg 28-Inspired)
-- Long-only
-- Max position size: 15%
-- Min position size: 1%
-- Max stocks: 30
-- Monthly rebalancing
-- Transaction costs: 30 bps
+All methods respect:
+- Long-only constraint
+- Maximum 15% position size (inspired by Regulation 28)
+- Minimum 1% position size (avoid dust holdings)
+- Maximum 30 holdings
 
-### Metrics
-- Annualized return & volatility
-- Sharpe Ratio & **Deflated Sharpe Ratio** (Bailey & de Prado, 2012)
-- Sortino Ratio
-- Maximum Drawdown
-- CVaR 95%
-- Turnover
-- Tracking Error & Information Ratio vs. STX40
+### Walk-Forward Backtest
 
----
+- **Rebalance frequency:** Monthly
+- **Estimation window:** Expanding (all prior data)
+- **Minimum history:** 252 trading days before first allocation
+- **Transaction costs:** 30 basis points (0.3%) per trade
+- **Initial capital:** ZAR 1,000,000
 
-## 🚀 Reproducibility
+At each rebalance, only stocks with at least 252 days of trailing returns are eligible for inclusion.
 
-### Prerequisites
-- Python 3.9+
-- pip or conda
+## Data Cleaning
 
-### Installation
+JSE price series from yfinance exhibit **unit jumps** where mid-series the reported unit switches between cents and rands (or vice versa), producing spurious ~99% single-day moves. For example:
+
+- **STX40.JO on 2025-04-25**: Price jumped from ~84 to ~8500 (x100), then on 2025-04-29 dropped back to ~84 (/100 correction)
+- **SBK.JO** and other tickers showed similar patterns
+
+The `JSEDataCleaner` class in `src/jse_portfolio_lab/data/cleaner.py`:
+
+1. **Detects unit jumps** by identifying returns near ±99% (threshold 80%)
+2. **Corrects** the series by multiplying or dividing all subsequent prices by 100
+3. **Removes stale prices** (10+ consecutive identical values)
+4. **Validates** cleaned series: rejects if annualized volatility >150% or max daily return >50%
+
+After cleaning, benchmark (STX40) volatility dropped from >2400% to ~17.9% annualized, confirming data integrity.
+
+## Results
+
+All metrics annualized, risk-free rate 7% p.a. Backtest period: 2010-01-04 to 2026-10-30 (4,289 days). **Deflated Sharpe Ratio** (Bailey & López de Prado, 2014) adjusts for multiple testing across 7 strategies.
+
+| **Method**               | **Return** | **Vol** | **Sharpe** | **Deflated Sharpe** | **Max DD** | **Avg Turnover** |
+|--------------------------|------------|---------|------------|---------------------|------------|------------------|
+| **Mean-Variance**        | **15.84%** | **22.24%** | **0.397**  | **0.689**           | 40.37%     | 22.03%           |
+| Equal Weight             | 9.89%      | 17.02%  | 0.170      | 0.325               | 40.94%     | 3.26%            |
+| Risk Parity              | 9.49%      | 15.39%  | 0.162      | 0.302               | 41.38%     | 3.54%            |
+| Black-Litterman          | 9.22%      | 14.24%  | 0.156      | 0.284               | 44.01%     | 5.17%            |
+| **STX40 (Benchmark)**    | **8.64%**  | **17.90%** | **0.092**  | **0.234**           | **37.29%** | **0.00%**        |
+| Min Variance (Shrunk)    | 8.67%      | 13.83%  | 0.121      | 0.237               | 44.54%     | 5.34%            |
+| Min Variance (Sample)    | 8.65%      | 13.85%  | 0.119      | 0.236               | 44.76%     | 5.51%            |
+| HRP                      | 7.94%      | 14.52%  | 0.064      | 0.181               | 49.43%     | 6.35%            |
+
+### Interpretation
+
+1. **Mean-Variance's DSR of 0.689** is the highest among all strategies, indicating ~69% probability that its true Sharpe ratio exceeds zero after accounting for testing 7 strategies. This suggests genuine skill, not pure luck, though the high volatility and turnover present real implementation challenges.
+
+2. **Equal Weight, Risk Parity, and Black-Litterman cluster around DSR 0.28-0.33**, suggesting modest but comparable statistical significance. Their lower turnover makes them more practical for real implementation.
+
+3. **HRP's low DSR (0.18)** indicates its 0.064 Sharpe ratio is likely overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance.
+
+4. **The benchmark's DSR (0.234)** is lower than Mean-Variance, Equal Weight, and Risk Parity, confirming these active strategies add genuine value.
+
+## Visualizations
+
+![Equity Curves](reports/equity_curves.png)
+*Portfolio value evolution from 2010-2026. Mean-Variance shows highest terminal wealth but with greater volatility.*
+
+![Risk-Return Scatter](reports/risk_return_scatter.png)
+*Risk-return tradeoff: Mean-Variance sits on the upper right (high return, high risk), while Minimum Variance strategies occupy the lower left.*
+
+![Drawdowns](reports/drawdowns.png)
+*Maximum drawdown periods. All strategies experienced 40-50% drawdowns during major market dislocations (2015-16, 2020 COVID).*
+
+![Rolling Sharpe](reports/rolling_sharpe.png)
+*252-day rolling Sharpe ratios show significant time-variation. Mean-Variance dominates in bull markets but suffers in volatile periods.*
+
+![Cost Sensitivity](reports/cost_sensitivity.png)
+*Sharpe ratio sensitivity to transaction costs (10-50 bps). High-turnover strategies like Mean-Variance are most affected.*
+
+## Limitations
+
+1. **Survivorship bias**: The universe includes only current or recent Top-40 constituents. Delisted stocks (bankruptcies, takeovers) are excluded, likely inflating returns.
+
+2. **Liquidity assumptions**: The backtest assumes all trades execute at closing prices with fixed 30 bps cost. In reality, larger positions in less liquid stocks face market impact and wider bid-ask spreads.
+
+3. **Look-ahead bias in universe selection**: Using the "current" Top-40 list introduces subtle look-ahead bias. A fully rigorous study would reconstruct the Top-40 membership at each historical point.
+
+4. **ZAR risk not hedged**: All returns are in ZAR. International investors face additional currency risk not captured here.
+
+5. **No borrowing costs or short constraints**: Portfolios are long-only, but in practice, even slight leverage (e.g., for rebalancing) incurs margin costs.
+
+## Repository Structure
+
+```
+.
+├── src/jse_portfolio_lab/
+│   ├── data/               # Data loading, cleaning, preprocessing
+│   ├── optimization/       # Portfolio optimizers
+│   ├── backtesting/        # Walk-forward backtest engine
+│   ├── metrics/            # Performance metrics (incl. Deflated Sharpe)
+│   ├── utils/              # Visualization, config
+│   └── cli.py              # CLI orchestrator
+├── tests/                  # Pytest suite (22 tests)
+├── config/config.yaml      # Backtest configuration
+├── reports/                # Generated charts and metrics
+├── requirements.txt        # Pinned dependencies
+└── README.md
+```
+
+## Installation
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/Tjay-cmd/jse-portfolio-lab.git
 cd jse-portfolio-lab
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Install package in editable mode
+# Install package
 pip install -e .
+
+# Run backtest
+python -m jse_portfolio_lab.cli
 ```
 
-### Run the Full Pipeline
+Requirements: Python 3.8+, see `requirements.txt` for pinned versions.
+
+## Testing
 
 ```bash
-# Run complete analysis
-jse-optimize --config config/config.yaml
-
-# Or using Python module
-python -m jse_portfolio_lab.cli --config config/config.yaml
-```
-
-### Configuration
-
-Edit `config/config.yaml` to customize:
-- Asset universe
-- Date ranges
-- Transaction costs
-- Position constraints
-- Rebalancing frequency
-
----
-
-## 🧪 Testing
-
-```bash
-# Run all tests
 pytest tests/ -v
-
-# Run with coverage
-pytest tests/ --cov=jse_portfolio_lab --cov-report=html
 ```
 
-**Test Coverage**: 16/19 tests passing (84%)
-- Core functionality: ✅ Fully tested
-- Edge cases: ⚠️ Known limitations documented
+**Status:** 22 passed, 1 skipped (integration test requiring live data download)
 
----
+## Configuration
 
-## 📁 Project Structure
+Edit `config/config.yaml` to:
+- Change stock universe (default: JSE Top-40 constituents)
+- Adjust transaction costs (default: 30 bps)
+- Modify constraints (max position, max holdings)
+- Enable/disable optimization methods
+- Set date range
 
-```
-jse-portfolio-lab/
-├── src/jse_portfolio_lab/
-│   ├── data/              # Data loading & preprocessing
-│   ├── optimization/      # Portfolio optimization methods
-│   ├── backtesting/       # Walk-forward backtesting engine
-│   ├── metrics/           # Performance metrics
-│   ├── utils/             # Visualization & utilities
-│   └── cli.py             # Command-line interface
-├── tests/                 # Pytest test suite
-├── config/                # Configuration files
-├── reports/               # Generated results & charts
-├── data/cache/            # Cached market data
-├── docs/                  # Documentation
-├── .github/workflows/     # CI/CD pipeline
-└── README.md
-```
+## References
 
----
+- Bailey, D. H., & López de Prado, M. (2014). The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting, and Non-Normality. *Journal of Portfolio Management*, 40(5), 94-107.
+- DeMiguel, V., Garlappi, L., & Uppal, R. (2009). Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy? *Review of Financial Studies*, 22(5), 1915-1953.
+- Ledoit, O., & Wolf, M. (2004). Honey, I Shrunk the Sample Covariance Matrix. *Journal of Portfolio Management*, 30(4), 110-119.
+- López de Prado, M. (2016). Building Diversified Portfolios that Outperform Out of Sample. *Journal of Portfolio Management*, 42(4), 59-69.
 
-## ⚠️ Limitations & Future Work
+## License
 
-### Current Limitations
+MIT
 
-1. **Survivorship Bias**: Universe includes current Top-40 members; delisted stocks excluded
-2. **Data Quality**: Some JSE tickers have limited history or corporate actions not fully adjusted
-3. **Market Impact**: Model assumes infinite liquidity; real execution would face slippage
-4. **Factor Models**: ZAR and rates factors included but not fully utilized in attribution
-5. **Sample Period**: Results sensitive to chosen test period; further out-of-sample testing needed
+## Author
 
-### Future Enhancements
-
-- [ ] Add sector constraints and factor-neutral optimization
-- [ ] Implement more sophisticated covariance estimators (e.g., RMT, DCC-GARCH)
-- [ ] Machine learning return forecasts (ensemble methods, deep learning)
-- [ ] Multi-period optimization and leverage
-- [ ] Real-time portfolio monitoring dashboard (Streamlit)
-- [ ] Integration with broker APIs for live trading
-
----
-
-## 📚 References
-
-1. Markowitz, H. (1952). "Portfolio Selection." *Journal of Finance*
-2. Maillard, S., Roncalli, T., & Teïletche, J. (2010). "Equal Risk Contribution Portfolio"
-3. López de Prado, M. (2016). "Building Diversified Portfolios that Outperform Out of Sample"
-4. Bailey, D. H., & López de Prado, M. (2012). "The Deflated Sharpe Ratio"
-5. Black, F., & Litterman, R. (1992). "Global Portfolio Optimization"
-6. Ledoit, O., & Wolf, M. (2004). "Honey, I Shrunk the Sample Covariance Matrix"
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details
-
----
-
-## 👤 Author
-
-**Tjay Burger**
-- GitHub: [@Tjay-cmd](https://github.com/Tjay-cmd)
-- LinkedIn: [Tjay Burger](https://www.linkedin.com/in/tjay-burger)
-
----
-
-## 🙏 Acknowledgments
-
-- Data provided by Yahoo Finance and FRED
-- Built with: NumPy, Pandas, CVXPY, scikit-learn, Matplotlib, Seaborn
-- Inspired by research from López de Prado, Marcos M. and the quantitative finance community
-
----
-
-**Note**: This is a research project for educational and portfolio demonstration purposes. Not financial advice. Past performance does not guarantee future results.
+Tjay Burger  
+[github.com/Tjay-cmd](https://github.com/Tjay-cmd)

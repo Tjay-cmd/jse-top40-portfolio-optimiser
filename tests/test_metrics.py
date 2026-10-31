@@ -137,3 +137,38 @@ def test_compute_all_metrics(sample_returns):
     for key in expected_keys:
         assert key in all_metrics
         assert np.isfinite(all_metrics[key])
+
+
+def test_deflated_sharpe_ratio():
+    """Test Deflated Sharpe Ratio implementation against expected behavior."""
+    pm = PerformanceMetrics(risk_free_rate=0.0)  # Zero RF for simplicity
+    
+    # Create synthetic returns with known properties
+    np.random.seed(42)
+    # Strategy with positive Sharpe
+    good_returns = pd.Series(np.random.randn(252) * 0.01 + 0.0005)  # ~12.6% annual return, ~16% vol
+    
+    # Strategy with zero mean
+    null_returns = pd.Series(np.random.randn(252) * 0.01)
+    
+    # Test 1: Single strategy should have high DSR if Sharpe is good
+    dsr_good_single = pm.deflated_sharpe_ratio(good_returns, n_trials=1)
+    assert 0.5 < dsr_good_single <= 1.0, f"DSR for good strategy with 1 trial should be high, got {dsr_good_single}"
+    
+    # Test 2: Same strategy with many trials should have lower DSR (multiple testing penalty)
+    dsr_good_multi = pm.deflated_sharpe_ratio(good_returns, n_trials=100)
+    assert dsr_good_multi < dsr_good_single, "DSR should decrease with more trials"
+    
+    # Test 3: Null strategy (zero Sharpe) should have DSR near 0.5 with few trials
+    dsr_null = pm.deflated_sharpe_ratio(null_returns, n_trials=1)
+    assert 0.3 < dsr_null < 0.7, f"DSR for null strategy should be near 0.5, got {dsr_null}"
+    
+    # Test 4: DSR should be between 0 and 1
+    dsr_test = pm.deflated_sharpe_ratio(good_returns, n_trials=10)
+    assert 0 <= dsr_test <= 1, f"DSR must be in [0, 1], got {dsr_test}"
+    
+    # Test 5: More trials should reduce DSR (unless Sharpe is very high)
+    dsr_10 = pm.deflated_sharpe_ratio(good_returns, n_trials=10)
+    dsr_50 = pm.deflated_sharpe_ratio(good_returns, n_trials=50)
+    # With modest Sharpe, more trials should penalize more
+    assert dsr_50 <= dsr_10 or dsr_50 > 0.9, "More trials should reduce DSR unless strategy is very strong"
