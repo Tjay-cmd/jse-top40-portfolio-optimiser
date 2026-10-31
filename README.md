@@ -9,15 +9,15 @@ Which portfolio construction method delivers the best out-of-sample risk-adjuste
 
 ## Key Findings
 
-1. **Mean-Variance optimization achieved the highest return (15.84%) but with proportionally higher risk (22.24% vol)** and significantly higher turnover (22.03%). While its Deflated Sharpe Ratio of 0.69 is the highest among strategies tested, this represents promising but not definitively proven outperformance.
+1. **Mean-Variance optimization achieved the highest return (15.88%) but with proportionally higher risk (22.96% vol)** and significantly higher turnover (21.72%). While its Deflated Sharpe Ratio of 0.66 is the highest among strategies tested, this represents promising but not definitively proven outperformance.
 
-2. **Equal Weight (1/N) outperformed the passive benchmark** with 9.89% return vs 8.64% for STX40, while maintaining lower turnover (3.26%) and comparable volatility. This confirms the findings of DeMiguel et al. (2009).
+2. **Equal Weight (1/N) outperformed the passive benchmark** with 10.33% return vs 8.34% for STX40, while maintaining lower turnover (3.25%) and comparable volatility. This confirms the findings of DeMiguel et al. (2009).
 
 3. **Deflated Sharpe Ratio correctly penalizes for multiple testing**: When testing 7 strategies, even good Sharpe ratios receive DSR < 0.7. The DSR represents the probability that the true Sharpe ratio exceeds the expected maximum Sharpe from luck alone across N trials, accounting for selection bias.
 
 4. **Transaction costs significantly impact high-turnover strategies**: Mean-Variance's elevated turnover leads to measurable cost drag that must be considered in implementation.
 
-5. **Hierarchical Risk Parity underperformed** with DSR 0.18, suggesting potential overfitting despite its theoretical appeal.
+5. **Hierarchical Risk Parity underperformed** with DSR 0.19, suggesting potential overfitting despite its theoretical appeal. Note: HRP's return (8.18%) is below the benchmark (8.34%) but its Sharpe (0.079) slightly exceeds the benchmark (0.075) due to HRP's lower volatility (14.98% vs 17.88%).
 
 ## Methodology
 
@@ -36,7 +36,7 @@ This period captures:
 - Multiple ZAR volatility cycles
 - Varying interest rate environments
 
-Stock availability ranges from 25 to 30 tickers per day (average 27.3), reflecting late listings such as PRX.JO (September 2019) without discarding earlier history for long-listed stocks.
+Stock availability ranges from 25 to 30 tickers per rebalance date (average 27.2), reflecting late listings such as PRX.JO (September 2019) without discarding earlier history for long-listed stocks.
 
 ### Portfolio Construction Methods
 
@@ -121,11 +121,11 @@ All metrics annualized, risk-free rate 7% p.a. **Evaluation period: 2010-12-31 t
 
 ### Interpretation
 
-1. **Mean-Variance's DSR of 0.660** is the highest among all strategies, indicating ~66% probability that its true Sharpe ratio exceeds the expected maximum Sharpe from luck alone (not zero) after accounting for testing 7 strategies. This suggests promising performance, though implementation challenges from high volatility and turnover remain. The measured annual cost drag is **1.57%** (21.72% monthly turnover × 2 sides × 30bps × 12 months), which reconciles correctly with the simple calculation.
+1. **Mean-Variance's DSR of 0.66** is the highest among all strategies, indicating ~66% probability that its true Sharpe ratio exceeds the expected maximum Sharpe from luck alone (not zero) after accounting for testing 7 strategies. This suggests promising performance, though implementation challenges from high volatility and turnover remain. The measured annual cost drag is **1.57%** (21.72% monthly turnover × 2 sides × 30bps × 12 months), which reconciles correctly with the simple calculation.
 
 2. **Equal Weight, Risk Parity, and Black-Litterman cluster around DSR 0.31-0.35**, suggesting modest statistical significance. Their low cost drag (0.23-0.36% annually) makes them more practical for implementation.
 
-3. **HRP's low DSR (0.20)** indicates its 0.079 Sharpe ratio is likely due to chance or overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance.
+3. **HRP's low DSR (0.19)** indicates its 0.079 Sharpe ratio is likely due to chance or overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance. Despite having a return (8.18%) below the benchmark (8.34%), HRP's Sharpe ratio (0.079) slightly exceeds the benchmark's (0.075) because HRP achieves significantly lower volatility (14.98% vs 17.88%).
 
 4. **The benchmark's DSR (0.209)** is lower than several active strategies, suggesting these methods add value beyond passive indexing.
 
@@ -193,7 +193,7 @@ pip install -e .
 python -m jse_portfolio_lab.cli
 ```
 
-Requirements: Python 3.8+, see `requirements.txt` for pinned versions.
+Requirements: Python 3.10+, see `requirements.txt` for pinned versions.
 
 ## Testing
 
@@ -201,7 +201,7 @@ Requirements: Python 3.8+, see `requirements.txt` for pinned versions.
 pytest tests/ -v
 ```
 
-**Status:** 22 passed, 1 skipped (integration test requiring live data download)
+**Status:** All tests passing
 
 ## Configuration
 
