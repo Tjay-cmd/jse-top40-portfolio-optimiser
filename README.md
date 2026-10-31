@@ -9,25 +9,26 @@ Which portfolio construction method delivers the best out-of-sample risk-adjuste
 
 ## Key Findings
 
-1. **Mean-Variance optimization achieved the highest return (15.84%) but with proportionally higher risk (22.24% vol)** and significantly higher turnover (22.03%). Its Deflated Sharpe Ratio of 0.69 suggests the outperformance is statistically robust, not purely luck.
+1. **Mean-Variance optimization achieved the highest return (15.84%) but with proportionally higher risk (22.24% vol)** and significantly higher turnover (22.03%). While its Deflated Sharpe Ratio of 0.69 is the highest among strategies tested, this represents promising but not definitively proven outperformance.
 
 2. **Equal Weight (1/N) outperformed the passive benchmark** with 9.89% return vs 8.64% for STX40, while maintaining lower turnover (3.26%) and comparable volatility. This confirms the findings of DeMiguel et al. (2009).
 
-3. **Deflated Sharpe Ratio correctly penalizes for multiple testing**: When testing 7 strategies, even good Sharpe ratios receive DSR < 0.7, indicating the winner may not be as strong as raw Sharpe suggests. Only Mean-Variance exceeded DSR 0.5.
+3. **Deflated Sharpe Ratio correctly penalizes for multiple testing**: When testing 7 strategies, even good Sharpe ratios receive DSR < 0.7. The DSR represents the probability that the true Sharpe ratio exceeds the expected maximum Sharpe from luck alone across N trials, accounting for selection bias.
 
-4. **Transaction costs matter**: Mean-Variance's 22% turnover erodes ~6.6% of gross returns at 30 bps, making implementation costs critical.
+4. **Transaction costs significantly impact high-turnover strategies**: Mean-Variance's elevated turnover leads to measurable cost drag that must be considered in implementation.
 
-5. **Hierarchical Risk Parity underperformed** with DSR 0.18, suggesting overfitting despite its theoretical appeal.
+5. **Hierarchical Risk Parity underperformed** with DSR 0.18, suggesting potential overfitting despite its theoretical appeal.
 
 ## Methodology
 
 ### Universe
 
-JSE Top-40 constituent equities, sourced via yfinance with `.JO` suffix. The backtest uses an **unbalanced panel**: stocks enter the universe once they have sufficient trading history (252 days), allowing the sample to span multiple market regimes rather than truncating to the latest listing date.
+JSE Top-40 constituent equities, sourced via yfinance with `.JO` suffix. The configuration lists **35 tickers** (after restoring BHG.JO as BHP Group). The backtest uses an **unbalanced panel**: stocks enter the universe once they have sufficient trading history (252 days), allowing the sample to span multiple market regimes rather than truncating to the latest listing date.
 
 ### Sample Period
 
-**2010-01-04 to 2026-10-30** (4,289 trading days, approximately 17 years)
+**Data range:** 2010-01-04 to 2026-10-30 (4,289 trading days)  
+**Evaluation period:** 2010-12-31 to 2026-10-30 (from first allocation date, ~16 years)
 
 This period captures:
 - The 2015-2016 commodity downturn
@@ -35,7 +36,7 @@ This period captures:
 - Multiple ZAR volatility cycles
 - Varying interest rate environments
 
-Stock availability ranges from 0 to 31 tickers per day (average 27.5), reflecting late listings such as PRX.JO (September 2019) without discarding earlier history for long-listed stocks.
+Stock availability ranges from 25 to 30 tickers per day (average 27.3), reflecting late listings such as PRX.JO (September 2019) without discarding earlier history for long-listed stocks.
 
 ### Portfolio Construction Methods
 
@@ -47,9 +48,11 @@ Stock availability ranges from 0 to 31 tickers per day (average 27.5), reflectin
 6. **Hierarchical Risk Parity (HRP)** - Machine-learning based clustering + inverse-variance allocation
 7. **Black-Litterman** - Market-implied equilibrium returns with Bayesian views
 
+The backtest tests **7 portfolio construction methods** against the JSE Top-40 index benchmark.
+
 All methods respect:
 - Long-only constraint
-- Maximum 15% position size (inspired by Regulation 28)
+- Maximum 15% position size at rebalancing (inspired by Regulation 28; weights may drift between rebalances)
 - Minimum 1% position size (avoid dust holdings)
 - Maximum 30 holdings
 
@@ -62,6 +65,26 @@ All methods respect:
 - **Initial capital:** ZAR 1,000,000
 
 At each rebalance, only stocks with at least 252 days of trailing returns are eligible for inclusion.
+
+#### Turnover and Cost Measurement
+
+**Turnover** is measured as **one-way turnover**: 
+```
+Turnover = sum(|new_weight - old_weight|) / 2
+```
+
+This represents the fraction of the portfolio that changes. For example, going from 50% A + 50% B to 100% A + 0% B has 50% one-way turnover (you sell 50% and buy 50%).
+
+**Transaction costs** are charged on **both buying and selling**:
+```
+Cost = Turnover × 2 × Cost_per_side × Portfolio_value
+```
+
+With 30bps cost per side and 20% monthly turnover:
+- Monthly cost = 20% × 2 × 0.3% = 0.12% of portfolio
+- Annual cost drag = 0.12% × 12 = 1.44%
+
+**Annual cost drag** is computed as the average cost rate (costs as % of portfolio value) at each rebalance, multiplied by 12. This correctly accounts for portfolio growth over time.
 
 ## Data Cleaning
 
@@ -81,33 +104,35 @@ After cleaning, benchmark (STX40) volatility dropped from >2400% to ~17.9% annua
 
 ## Results
 
-All metrics annualized, risk-free rate 7% p.a. Backtest period: 2010-01-04 to 2026-10-30 (4,289 days). **Deflated Sharpe Ratio** (Bailey & López de Prado, 2014) adjusts for multiple testing across 7 strategies.
+All metrics annualized, risk-free rate 7% p.a. **Evaluation period: 2010-12-31 to 2026-10-30** (from first allocation date). **Deflated Sharpe Ratio** (Bailey & López de Prado, 2014) adjusts for multiple testing across 7 strategies.
 
-| **Method**               | **Return** | **Vol** | **Sharpe** | **Deflated Sharpe** | **Max DD** | **Avg Turnover** |
-|--------------------------|------------|---------|------------|---------------------|------------|------------------|
-| **Mean-Variance**        | **15.84%** | **22.24%** | **0.397**  | **0.689**           | 40.37%     | 22.03%           |
-| Equal Weight             | 9.89%      | 17.02%  | 0.170      | 0.325               | 40.94%     | 3.26%            |
-| Risk Parity              | 9.49%      | 15.39%  | 0.162      | 0.302               | 41.38%     | 3.54%            |
-| Black-Litterman          | 9.22%      | 14.24%  | 0.156      | 0.284               | 44.01%     | 5.17%            |
-| **STX40 (Benchmark)**    | **8.64%**  | **17.90%** | **0.092**  | **0.234**           | **37.29%** | **0.00%**        |
-| Min Variance (Shrunk)    | 8.67%      | 13.83%  | 0.121      | 0.237               | 44.54%     | 5.34%            |
-| Min Variance (Sample)    | 8.65%      | 13.85%  | 0.119      | 0.236               | 44.76%     | 5.51%            |
-| HRP                      | 7.94%      | 14.52%  | 0.064      | 0.181               | 49.43%     | 6.35%            |
+| **Method**               | **Return** | **Vol** | **Sharpe** | **Deflated Sharpe** | **Max DD** | **Avg Turnover** | **Annual Cost Drag** |
+|--------------------------|------------|---------|------------|---------------------|------------|------------------|----------------------|
+| **Mean-Variance**        | **15.88%** | **22.96%** | **0.387**  | **0.660**           | 40.40%     | 21.72%           | **1.57%**            |
+| Equal Weight             | 10.33%     | 17.56%  | 0.189      | 0.345               | 41.08%     | 3.25%            | 0.23%                |
+| Risk Parity              | 9.90%      | 15.88%  | 0.183      | 0.323               | 41.53%     | 3.49%            | 0.25%                |
+| Black-Litterman          | 9.61%      | 14.69%  | 0.178      | 0.307               | 44.20%     | 4.98%            | 0.36%                |
+| Min Variance (Shrunk)    | 9.06%      | 14.27%  | 0.144      | 0.262               | 44.74%     | 5.06%            | 0.36%                |
+| Min Variance (Sample)    | 9.03%      | 14.29%  | 0.142      | 0.259               | 44.98%     | 5.23%            | 0.38%                |
+| **STX40 (Benchmark)**    | **8.34%**  | **17.88%** | **0.075**  | **0.209**           | **37.29%** | **0.00%**        | **0.00%**            |
+| HRP                      | 8.18%      | 14.98%  | 0.079      | 0.195               | 49.72%     | 6.25%            | 0.45%                |
+
+**Cost Reconciliation:** For Mean-Variance with 21.72% monthly turnover: Annual cost = 21.72% × 2 (both sides) × 0.3% (per side) × 12 (months) = 1.57% ✓
 
 ### Interpretation
 
-1. **Mean-Variance's DSR of 0.689** is the highest among all strategies, indicating ~69% probability that its true Sharpe ratio exceeds zero after accounting for testing 7 strategies. This suggests genuine skill, not pure luck, though the high volatility and turnover present real implementation challenges.
+1. **Mean-Variance's DSR of 0.660** is the highest among all strategies, indicating ~66% probability that its true Sharpe ratio exceeds the expected maximum Sharpe from luck alone (not zero) after accounting for testing 7 strategies. This suggests promising performance, though implementation challenges from high volatility and turnover remain. The measured annual cost drag is **1.57%** (21.72% monthly turnover × 2 sides × 30bps × 12 months), which reconciles correctly with the simple calculation.
 
-2. **Equal Weight, Risk Parity, and Black-Litterman cluster around DSR 0.28-0.33**, suggesting modest but comparable statistical significance. Their lower turnover makes them more practical for real implementation.
+2. **Equal Weight, Risk Parity, and Black-Litterman cluster around DSR 0.31-0.35**, suggesting modest statistical significance. Their low cost drag (0.23-0.36% annually) makes them more practical for implementation.
 
-3. **HRP's low DSR (0.18)** indicates its 0.064 Sharpe ratio is likely overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance.
+3. **HRP's low DSR (0.20)** indicates its 0.079 Sharpe ratio is likely due to chance or overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance.
 
-4. **The benchmark's DSR (0.234)** is lower than Mean-Variance, Equal Weight, and Risk Parity, confirming these active strategies add genuine value.
+4. **The benchmark's DSR (0.209)** is lower than several active strategies, suggesting these methods add value beyond passive indexing.
 
 ## Visualizations
 
 ![Equity Curves](reports/equity_curves.png)
-*Portfolio value evolution from 2010-2026. Mean-Variance shows highest terminal wealth but with greater volatility.*
+*Portfolio value evolution from first allocation (2010-12-31) to 2026-10-30. Mean-Variance shows highest terminal wealth but with greater volatility.*
 
 ![Risk-Return Scatter](reports/risk_return_scatter.png)
 *Risk-return tradeoff: Mean-Variance sits on the upper right (high return, high risk), while Minimum Variance strategies occupy the lower left.*
@@ -119,7 +144,7 @@ All metrics annualized, risk-free rate 7% p.a. Backtest period: 2010-01-04 to 20
 *252-day rolling Sharpe ratios show significant time-variation. Mean-Variance dominates in bull markets but suffers in volatile periods.*
 
 ![Cost Sensitivity](reports/cost_sensitivity.png)
-*Sharpe ratio sensitivity to transaction costs (10-50 bps). High-turnover strategies like Mean-Variance are most affected.*
+*Sharpe ratio sensitivity to transaction costs (10-50 bps). All 7 methods included to compare cost impact across strategies.*
 
 ## Limitations
 
@@ -155,8 +180,8 @@ All metrics annualized, risk-free rate 7% p.a. Backtest period: 2010-01-04 to 20
 
 ```bash
 # Clone repository
-git clone https://github.com/Tjay-cmd/jse-portfolio-lab.git
-cd jse-portfolio-lab
+git clone https://github.com/Tjay-cmd/jse-top40-portfolio-optimiser.git
+cd jse-top40-portfolio-optimiser
 
 # Install dependencies
 pip install -r requirements.txt
