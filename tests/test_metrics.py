@@ -172,3 +172,18 @@ def test_deflated_sharpe_ratio():
     dsr_50 = pm.deflated_sharpe_ratio(good_returns, n_trials=50)
     # With modest Sharpe, more trials should penalize more
     assert dsr_50 <= dsr_10 or dsr_50 > 0.9, "More trials should reduce DSR unless strategy is very strong"
+
+
+def test_annualized_return_trading_day_convention():
+    """Annualization is (1+r).prod()**(252/n)-1, not calendar-day or PV ratio."""
+    dates = pd.bdate_range("2020-01-01", periods=252)
+    returns = pd.Series(0.001, index=dates)
+    metrics = PerformanceMetrics()
+
+    expected = (1.001 ** 252) - 1
+    assert np.isclose(metrics.annualized_return(returns), expected, rtol=1e-12)
+
+    # A shorter window must use n=len(returns), not 365.25 calendar days
+    short = returns.iloc[:126]
+    expected_short = (1.001 ** 126) ** (252 / 126) - 1
+    assert np.isclose(metrics.annualized_return(short), expected_short, rtol=1e-12)

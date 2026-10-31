@@ -9,21 +9,25 @@ Which portfolio construction method delivers the best out-of-sample risk-adjuste
 
 ## Key Findings
 
-1. **Mean-Variance optimization achieved the highest return (15.84%) but with proportionally higher risk (22.24% vol)** and significantly higher turnover (22.03%). While its Deflated Sharpe Ratio of 0.69 is the highest among strategies tested, this represents promising but not definitively proven outperformance.
+<!-- METRICS:KEY_FINDINGS:START -->
+1. **Mean-Variance optimization achieved the highest return (15.88%) but with proportionally higher risk (22.96% vol)** and significantly higher turnover (21.72%). Its Sharpe ratio is 0.387 and its Deflated Sharpe Ratio is 0.660 — the highest among strategies tested, but still below the usual 0.95 threshold. This is promising, not proven outperformance.
 
-2. **Equal Weight (1/N) outperformed the passive benchmark** with 9.89% return vs 8.64% for STX40, while maintaining lower turnover (3.26%) and comparable volatility. This confirms the findings of DeMiguel et al. (2009).
+2. **Equal Weight (1/N) outperformed the passive benchmark** with 10.33% return vs 8.34% for STX40, while maintaining lower turnover (3.25%) and comparable volatility. This confirms the findings of DeMiguel et al. (2009).
 
-3. **Deflated Sharpe Ratio correctly penalizes for multiple testing**: When testing 7 strategies, even good Sharpe ratios receive DSR < 0.7. The DSR represents the probability that the true Sharpe ratio exceeds the expected maximum Sharpe from luck alone across N trials, accounting for selection bias.
+3. **Deflated Sharpe Ratio correctly penalizes for multiple testing**: When testing 7 strategies, even good Sharpe ratios receive DSR < 0.7. The DSR is the probability that the true Sharpe exceeds the expected maximum Sharpe from luck across the N=7 trials, not the probability that it exceeds zero.
 
-4. **Transaction costs significantly impact high-turnover strategies**: Mean-Variance's elevated turnover leads to measurable cost drag that must be considered in implementation.
+4. **Transaction costs significantly impact high-turnover strategies**: Mean-Variance's annual cost drag is 1.57% (21.72% monthly one-way turnover × 2 sides × 30 bps × 12).
 
-5. **Hierarchical Risk Parity underperformed** with DSR 0.18, suggesting potential overfitting despite its theoretical appeal.
+5. **Hierarchical Risk Parity underperformed on return** (8.18% vs 8.34% for STX40) with DSR 0.195. HRP's Sharpe (0.079) still slightly beats STX40 (0.075) because HRP's volatility (14.98%) is lower than the benchmark (17.88%). That is a volatility effect, not higher absolute return.
+<!-- METRICS:KEY_FINDINGS:END -->
 
 ## Methodology
 
 ### Universe
 
-JSE Top-40 constituent equities, sourced via yfinance with `.JO` suffix. The configuration lists **35 tickers** (after restoring BHG.JO as BHP Group). The backtest uses an **unbalanced panel**: stocks enter the universe once they have sufficient trading history (252 days), allowing the sample to span multiple market regimes rather than truncating to the latest listing date.
+JSE Top-40 constituent equities, sourced via yfinance with `.JO` suffix. The configuration lists **35 tickers**. After download and quality filters, **31 series load** (some names have insufficient history or fail the unit-jump / volatility checks). The backtest uses an **unbalanced panel**: stocks enter once they have 252 days of trailing history.
+
+Ticker labels: **BHG.JO is BHP Group** (JSE listing); **BVT.JO is Bidvest**. Bidvest is listed once. BHP.JO / BIL.JO are additional BHP-related listings in the configured set.
 
 ### Sample Period
 
@@ -36,7 +40,7 @@ This period captures:
 - Multiple ZAR volatility cycles
 - Varying interest rate environments
 
-Stock availability ranges from 25 to 30 tickers per day (average 27.3), reflecting late listings such as PRX.JO (September 2019) without discarding earlier history for long-listed stocks.
+On any trading day, **25–31 of the 31 loaded names have a valid price (average 27.5)**. Rebalance holdings can be lower than that because of the 30-name cap and the 1% minimum weight. Late listings such as PRX.JO (September 2019) enter when they have enough history; earlier history for long-listed names is kept.
 
 ### Portfolio Construction Methods
 
@@ -104,30 +108,34 @@ After cleaning, benchmark (STX40) volatility dropped from >2400% to ~17.9% annua
 
 ## Results
 
+<!-- METRICS:RESULTS:START -->
 All metrics annualized, risk-free rate 7% p.a. **Evaluation period: 2010-12-31 to 2026-10-30** (from first allocation date). **Deflated Sharpe Ratio** (Bailey & López de Prado, 2014) adjusts for multiple testing across 7 strategies.
+
+Annualized return uses one convention everywhere: `(1 + r).prod() ** (252 / n) - 1` on daily returns in the evaluation window (`n` = number of trading days). That is the figure in `reports/metrics.csv`. Comparing terminal portfolio value to the value already observed on the first allocation date omits the first-day transaction-cost return and is not used.
 
 | **Method**               | **Return** | **Vol** | **Sharpe** | **Deflated Sharpe** | **Max DD** | **Avg Turnover** | **Annual Cost Drag** |
 |--------------------------|------------|---------|------------|---------------------|------------|------------------|----------------------|
-| **Mean-Variance**        | **15.88%** | **22.96%** | **0.387**  | **0.660**           | 40.40%     | 21.72%           | **1.57%**            |
+| **Mean-Variance**        | **15.88%** | **22.96%** | **0.387**  | **0.660**           | **40.40%**     | **21.72%**        | **1.57%**            |
 | Equal Weight             | 10.33%     | 17.56%  | 0.189      | 0.345               | 41.08%     | 3.25%            | 0.23%                |
 | Risk Parity              | 9.90%      | 15.88%  | 0.183      | 0.323               | 41.53%     | 3.49%            | 0.25%                |
 | Black-Litterman          | 9.61%      | 14.69%  | 0.178      | 0.307               | 44.20%     | 4.98%            | 0.36%                |
 | Min Variance (Shrunk)    | 9.06%      | 14.27%  | 0.144      | 0.262               | 44.74%     | 5.06%            | 0.36%                |
 | Min Variance (Sample)    | 9.03%      | 14.29%  | 0.142      | 0.259               | 44.98%     | 5.23%            | 0.38%                |
-| **STX40 (Benchmark)**    | **8.34%**  | **17.88%** | **0.075**  | **0.209**           | **37.29%** | **0.00%**        | **0.00%**            |
+| **STX40 (Benchmark)**    | **8.34%** | **17.88%** | **0.075**  | **0.209**           | **37.29%**     | **0.00%**        | **0.00%**            |
 | HRP                      | 8.18%      | 14.98%  | 0.079      | 0.195               | 49.72%     | 6.25%            | 0.45%                |
 
-**Cost Reconciliation:** For Mean-Variance with 21.72% monthly turnover: Annual cost = 21.72% × 2 (both sides) × 0.3% (per side) × 12 (months) = 1.57% ✓
+**Cost Reconciliation:** For Mean-Variance with 21.72% monthly one-way turnover: Annual cost ≈ 21.72% × 2 (both sides) × 0.3% (per side) × 12 (months) = 1.56%. The reported drag (1.57%) is the average of (cost / portfolio value) at each rebalance, times 12.
 
 ### Interpretation
 
-1. **Mean-Variance's DSR of 0.660** is the highest among all strategies, indicating ~66% probability that its true Sharpe ratio exceeds the expected maximum Sharpe from luck alone (not zero) after accounting for testing 7 strategies. This suggests promising performance, though implementation challenges from high volatility and turnover remain. The measured annual cost drag is **1.57%** (21.72% monthly turnover × 2 sides × 30bps × 12 months), which reconciles correctly with the simple calculation.
+1. **Mean-Variance's DSR of 0.660** is the highest among all strategies: the probability that its true Sharpe exceeds the expected maximum Sharpe from luck across N=7 trials (not the probability it exceeds zero). That is promising, not a claim of proven skill. Annual cost drag is **1.57%**.
 
-2. **Equal Weight, Risk Parity, and Black-Litterman cluster around DSR 0.31-0.35**, suggesting modest statistical significance. Their low cost drag (0.23-0.36% annually) makes them more practical for implementation.
+2. **Equal Weight (DSR 0.345), Risk Parity (DSR 0.323), and Black-Litterman (DSR 0.307)** form a lower-turnover cluster. Their annual cost drag is 0.23%–0.36%.
 
-3. **HRP's low DSR (0.20)** indicates its 0.079 Sharpe ratio is likely due to chance or overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance.
+3. **HRP return (8.18%) is below STX40 (8.34%)**, but HRP's Sharpe (0.079) is slightly above STX40 (0.075) because HRP volatility (14.98%) is lower than the benchmark (17.88%). DSR 0.195 still indicates the edge is not distinguishable from luck across 7 trials.
 
-4. **The benchmark's DSR (0.209)** is lower than several active strategies, suggesting these methods add value beyond passive indexing.
+4. **The benchmark's DSR (0.209)** is lower than Equal Weight, Risk Parity, Black-Litterman, and Mean-Variance.
+<!-- METRICS:RESULTS:END -->
 
 ## Visualizations
 
@@ -169,7 +177,7 @@ All metrics annualized, risk-free rate 7% p.a. **Evaluation period: 2010-12-31 t
 │   ├── metrics/            # Performance metrics (incl. Deflated Sharpe)
 │   ├── utils/              # Visualization, config
 │   └── cli.py              # CLI orchestrator
-├── tests/                  # Pytest suite (22 tests)
+├── tests/                  # Pytest suite (one live-data integration test is skipped)
 ├── config/config.yaml      # Backtest configuration
 ├── reports/                # Generated charts and metrics
 ├── requirements.txt        # Pinned dependencies
@@ -193,7 +201,7 @@ pip install -e .
 python -m jse_portfolio_lab.cli
 ```
 
-Requirements: Python 3.8+, see `requirements.txt` for pinned versions.
+Requirements: Python 3.12+, see `requirements.txt` for dependency ranges.
 
 ## Testing
 
@@ -201,7 +209,7 @@ Requirements: Python 3.8+, see `requirements.txt` for pinned versions.
 pytest tests/ -v
 ```
 
-**Status:** 22 passed, 1 skipped (integration test requiring live data download)
+One integration test is skipped (requires a live download). Do not hardcode a pass count here — `pytest tests/ -v` is the source of truth.
 
 ## Configuration
 
@@ -227,3 +235,4 @@ MIT
 
 Tjay Burger  
 [github.com/Tjay-cmd](https://github.com/Tjay-cmd)
+

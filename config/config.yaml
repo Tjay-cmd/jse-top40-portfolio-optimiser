@@ -7,7 +7,7 @@ data:
     - NPN.JO    # Naspers
     - PRX.JO    # Prosus
     - AGL.JO    # Anglo American
-    - BHP.JO    # BHP Group
+    - BHP.JO    # BHP Group (alternate yfinance symbol)
     - SOL.JO    # Sasol
     - MTN.JO    # MTN Group
     - SBK.JO    # Standard Bank
@@ -18,7 +18,7 @@ data:
     - VOD.JO    # Vodacom
     - AMS.JO    # Anglo American Platinum
     - IMP.JO    # Impala Platinum
-    - BHG.JO    # BHP Group
+    - BHG.JO    # BHP Group (JSE listing; not Bidvest)
     - REM.JO    # Remgro
     - SLM.JO    # Sanlam
     - GFI.JO    # Gold Fields
@@ -28,7 +28,7 @@ data:
     - NRP.JO    # Nepi Rockcastle
     - BTI.JO    # British American Tobacco
     - CFR.JO    # Richemont
-    - BVT.JO    # The Bidvest Group
+    - BVT.JO    # Bidvest
     - MRP.JO    # Mr Price
     - TBS.JO    # Tiger Brands
     - APN.JO    # Aspen

@@ -26,6 +26,15 @@ class PerformanceMetrics:
     def annualized_return(self, returns: pd.Series) -> float:
         """
         Compute annualized return.
+
+        Canonical convention (used in reports/metrics.csv and the README):
+
+            (1 + r).prod() ** (252 / n) - 1
+
+        where ``r`` is the daily return series on the evaluation window and
+        ``n = len(r)`` is the number of trading days. Do not annualize from
+        calendar days, and do not use terminal / first portfolio-value on
+        the window (that omits the first-day cost return).
         
         Parameters
         ----------
