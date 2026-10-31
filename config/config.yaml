@@ -46,8 +46,8 @@ data:
   usd_zar: ZAR=X  # USD/ZAR exchange rate
   sa_10y_yield_fred: IRLTLT01ZAM156N  # SA 10-year government bond yield
   
-  # Date range
-  start_date: '2015-01-01'
+  # Date range - extended for longer test period
+  start_date: '2010-01-01'
   end_date: null  # null = today
   
   # Data handling

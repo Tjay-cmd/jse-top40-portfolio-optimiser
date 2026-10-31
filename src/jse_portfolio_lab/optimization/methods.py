@@ -82,15 +82,14 @@ class MinVarianceOptimizer(PortfolioOptimizer):
         
         if prob.status not in ['optimal', 'optimal_inaccurate']:
             print(f"Warning: Optimization status: {prob.status}")
-            # Fallback to inverse volatility
+            # Fallback to inverse volatility, but apply constraints properly
             vols = returns.std()
-            weights = 1.0 / vols
-            weights = weights / weights.sum()
-            weights = pd.Series(weights.values, index=returns.columns)
+            weights_raw = 1.0 / vols
+            weights = pd.Series(weights_raw.values / weights_raw.sum(), index=returns.columns)
         else:
             weights = pd.Series(w.value, index=returns.columns)
-            weights = weights / weights.sum()  # Ensure sum to 1
         
+        # Always apply constraints (handles normalization too)
         return self.apply_constraints(weights)
 
 
@@ -175,14 +174,13 @@ class MeanVarianceOptimizer(PortfolioOptimizer):
             
             if prob.status in ['optimal', 'optimal_inaccurate']:
                 weights = pd.Series(w.value, index=returns.columns)
-                weights = weights / weights.sum()
             else:
                 print(f"Warning: Sharpe optimization failed: {prob.status}")
                 # Fallback to mean-vol weighting
                 sharpes = (exp_returns - self.risk_free_rate) / returns.std()
                 sharpes = sharpes.clip(lower=0)
                 if sharpes.sum() > 0:
-                    weights = sharpes / sharpes.sum()
+                    weights = pd.Series(sharpes.values / sharpes.sum(), index=returns.columns)
                 else:
                     weights = pd.Series(1.0 / n, index=returns.columns)
         else:

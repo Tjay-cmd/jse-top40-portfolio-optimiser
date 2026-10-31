@@ -88,40 +88,49 @@ class PortfolioOptimizer(ABC):
             weights = pd.Series(0.0, index=weights.index)
             weights.loc[top_stocks.index] = top_stocks.values
         
-        # Iteratively apply max position constraint and renormalize
-        for _ in range(20):
-            # Find weights exceeding max
-            excess_mask = weights > self.max_position_size
+        # Iteratively apply max position constraint
+        # This handles cases where after renormalization some weights exceed max again
+        max_iterations = 50
+        for iteration in range(max_iterations):
+            # Check which weights exceed max
+            violations = weights > self.max_position_size + 1e-10
             
-            if not excess_mask.any():
-                break
+            if not violations.any():
+                break  # Converged
             
-            # Set excess weights to max
-            weights[excess_mask] = self.max_position_size
+            # Cap violating weights
+            excess_total = (weights[violations] - self.max_position_size).sum()
+            weights[violations] = self.max_position_size
             
-            # Rescale remaining weights
-            excess_weight = weights[excess_mask].sum()
-            remaining_mask = ~excess_mask & (weights > 0)
-            remaining_weight = weights[remaining_mask].sum()
+            # Redistribute excess to non-violating, non-zero weights
+            can_absorb = (weights < self.max_position_size - 1e-10) & (weights > 1e-10)
             
-            if remaining_weight > 1e-10:
-                # Distribute deficit across remaining weights
-                deficit = 1.0 - excess_weight
-                weights[remaining_mask] *= deficit / remaining_weight
-            else:
-                # All constrained, just normalize
-                break
+            if can_absorb.any():
+                # Proportionally distribute excess
+                absorb_weights = weights[can_absorb]
+                absorb_capacity = (self.max_position_size - absorb_weights).sum()
+                
+                if absorb_capacity > excess_total:
+                    # Can absorb proportionally
+                    weights[can_absorb] += excess_total * (absorb_weights / absorb_weights.sum())
+                else:
+                    # Max out absorbers and spread remaining
+                    weights[can_absorb] = self.max_position_size
+            
+            # Renormalize
+            if weights.sum() > 1e-10:
+                weights = weights / weights.sum()
         
-        # Final normalization
+        # Final safety normalization
         if weights.sum() > 1e-10:
             weights = weights / weights.sum()
         else:
-            # If all weights are zero, equal weight
             weights = pd.Series(1.0 / len(weights), index=weights.index)
         
-        # Final clip to ensure no fp errors
+        # Absolute final clip (should be no-op if converged)
         weights = weights.clip(upper=self.max_position_size)
-        weights = weights / weights.sum()
+        if weights.sum() > 0:
+            weights = weights / weights.sum()
         
         return weights
     

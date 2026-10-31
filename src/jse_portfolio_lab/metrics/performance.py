@@ -19,7 +19,7 @@ class PerformanceMetrics:
         Parameters
         ----------
         risk_free_rate : float
-            Annual risk-free rate
+            Annual risk-free rate (as decimal, e.g., 0.07 for 7%)
         """
         self.risk_free_rate = risk_free_rate
     
@@ -184,12 +184,22 @@ class PerformanceMetrics:
         Returns
         -------
         float
-            Maximum drawdown (positive number)
+            Maximum drawdown (positive number, between 0 and 1)
         """
+        if len(returns) == 0:
+            return 0.0
+        
         cumulative = (1 + returns).cumprod()
         running_max = cumulative.expanding().max()
         drawdown = (cumulative - running_max) / running_max
-        return abs(drawdown.min())
+        max_dd = abs(drawdown.min())
+        
+        # Sanity check: drawdown can't exceed 100% for long-only
+        if max_dd > 1.0:
+            print(f"Warning: Max drawdown {max_dd:.2%} exceeds 100%, capping at 100%")
+            max_dd = 1.0
+        
+        return max_dd
     
     def calmar_ratio(self, returns: pd.Series) -> float:
         """

@@ -65,7 +65,8 @@ class DataLoader:
         tickers: List[str],
         start_date: str,
         end_date: Optional[str] = None,
-        use_cache: bool = True
+        use_cache: bool = True,
+        min_data_points: int = 500
     ) -> pd.DataFrame:
         """
         Fetch adjusted close prices for a list of tickers.
@@ -132,10 +133,10 @@ class DataLoader:
                 if close_data is not None:
                     # Ensure it's a series
                     if isinstance(close_data, pd.Series):
-                        if len(close_data) > 10:  # At least 10 data points
+                        if len(close_data) >= min_data_points:
                             prices_dict[ticker] = close_data
                         else:
-                            print(f"Warning: Insufficient data for {ticker} ({len(close_data)} points)")
+                            print(f"Warning: Insufficient data for {ticker} ({len(close_data)} points, need {min_data_points})")
                     elif isinstance(close_data, (int, float)):
                         print(f"Warning: Scalar data for {ticker}")
                     else:

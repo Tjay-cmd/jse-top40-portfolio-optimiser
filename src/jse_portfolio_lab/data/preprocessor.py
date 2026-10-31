@@ -94,7 +94,7 @@ class DataPreprocessor:
     
     def compute_returns(self, prices: pd.DataFrame) -> pd.DataFrame:
         """
-        Compute log returns from prices.
+        Compute log returns from prices with data quality filters.
         
         Parameters
         ----------
@@ -107,7 +107,16 @@ class DataPreprocessor:
             Log returns
         """
         returns = np.log(prices / prices.shift(1))
-        return returns.dropna()
+        returns = returns.dropna()
+        
+        # Data quality filter: cap extreme returns (likely bad ticks/splits)
+        # Daily returns beyond +300% or -95% are very suspicious
+        print(f"Before filtering: {(returns > 1.0).sum().sum()} returns > 100%, {(returns < -0.95).sum().sum()} returns < -95%")
+        
+        # Replace extreme values with NaN, then forward fill
+        returns = returns.clip(lower=-0.95, upper=np.log(4.0))  # Log(4) ≈ 1.39 = +300%
+        
+        return returns
     
     def align_data(
         self,
@@ -203,10 +212,16 @@ class DataPreprocessor:
         # Compute returns
         returns = self.compute_returns(aligned['prices'])
         
-        # Compute factor returns
+        # Compute factor returns (with same data quality filters)
         factors = {}
-        factors['benchmark'] = self.compute_returns(aligned['benchmark'].to_frame()).iloc[:, 0]
-        factors['fx'] = self.compute_returns(aligned['fx'].to_frame()).iloc[:, 0]
+        bench_ret = self.compute_returns(aligned['benchmark'].to_frame()).iloc[:, 0]
+        # Apply same extreme return filter
+        bench_ret = bench_ret.clip(lower=-0.95, upper=np.log(4.0))
+        factors['benchmark'] = bench_ret
+        
+        fx_ret = self.compute_returns(aligned['fx'].to_frame()).iloc[:, 0]
+        fx_ret = fx_ret.clip(lower=-0.95, upper=np.log(4.0))
+        factors['fx'] = fx_ret
         
         if aligned['rf_rate'] is not None:
             # Convert annual yield to daily rate

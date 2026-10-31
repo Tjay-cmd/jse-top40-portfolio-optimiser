@@ -139,6 +139,9 @@ def main(config: str, use_cache: bool, verbose: bool):
     
     prices, returns, factors = preprocessor.preprocess_all(raw_data)
     
+    # Get clean benchmark returns from factors
+    benchmark_returns = factors['benchmark']
+    
     if verbose:
         click.echo(f"\nDataset summary:")
         click.echo(f"  Date range: {returns.index[0].date()} to {returns.index[-1].date()}")
@@ -187,11 +190,7 @@ def main(config: str, use_cache: bool, verbose: bool):
     
     metrics_calc = PerformanceMetrics(risk_free_rate=cfg['risk_free_rate'])
     
-    # Compute benchmark returns
-    benchmark_prices = raw_data['benchmark'].reindex(prices.index, method='ffill')
-    benchmark_prices = benchmark_prices / benchmark_prices.iloc[0] * cfg['backtest']['initial_capital']
-    benchmark_returns = benchmark_prices.pct_change().fillna(0)
-    
+    # Compute portfolio metrics (benchmark_returns already set from preprocessor)
     for method_name, result in results.items():
         metrics = metrics_calc.compute_all_metrics(
             result.returns,
@@ -200,6 +199,12 @@ def main(config: str, use_cache: bool, verbose: bool):
         )
         metrics['Method'] = method_name
         metrics_list.append(metrics)
+    
+    # Add benchmark metrics
+    benchmark_metrics = metrics_calc.compute_all_metrics(benchmark_returns)
+    benchmark_metrics['Method'] = 'STX40 (Benchmark)'
+    benchmark_metrics['Avg Turnover'] = 0.0  # Index doesn't rebalance
+    metrics_list.append(benchmark_metrics)
     
     metrics_df = pd.DataFrame(metrics_list).set_index('Method')
     
@@ -230,9 +235,10 @@ def main(config: str, use_cache: bool, verbose: bool):
         plot_dpi=cfg['reporting']['plot_dpi']
     )
     
-    # Equity curves
+    # Equity curves (reconstruct benchmark portfolio value from returns)
     portfolio_values = {name: res.portfolio_value for name, res in results.items()}
-    viz.plot_equity_curves(portfolio_values, benchmark_prices, "equity_curves.png")
+    benchmark_portfolio_value = (1 + benchmark_returns).cumprod() * cfg['backtest']['initial_capital']
+    viz.plot_equity_curves(portfolio_values, benchmark_portfolio_value, "equity_curves.png")
     
     # Drawdowns
     portfolio_returns = {name: res.returns for name, res in results.items()}
