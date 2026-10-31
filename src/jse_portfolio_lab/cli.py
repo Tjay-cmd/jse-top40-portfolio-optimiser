@@ -222,13 +222,28 @@ def main(config: str, use_cache: bool, verbose: bool):
         metrics['Method'] = method_name
         
         # Compute actual cost drag from backtest
-        total_costs = result.transaction_costs[result.transaction_costs.index >= evaluation_start_date].sum()
-        n_years = len(returns_eval) / 252
-        if n_years > 0:
-            annual_cost_drag = (total_costs / cfg['backtest']['initial_capital']) / n_years
-            metrics['Annual Cost Drag'] = annual_cost_drag
+        # Cost drag = average cost rate per period × periods per year
+        # This accounts for the fact that portfolio value grows over time
+        if len(result.turnover) > 0:
+            turnover_dates = result.turnover.index
+            turnover_dates_eval = turnover_dates[turnover_dates >= evaluation_start_date]
+            
+            if len(turnover_dates_eval) > 0:
+                # Get portfolio values at each rebalance date
+                portfolio_vals_at_rebal = result.portfolio_value.loc[turnover_dates_eval]
+                costs_at_rebal = result.transaction_costs.loc[turnover_dates_eval]
+                
+                # Average cost as % of portfolio value per rebalance
+                avg_cost_rate = (costs_at_rebal / portfolio_vals_at_rebal).mean()
+                
+                # Annualize (12 monthly rebalances per year)
+                annual_cost_drag = avg_cost_rate * 12
+            else:
+                annual_cost_drag = 0.0
         else:
-            metrics['Annual Cost Drag'] = 0.0
+            annual_cost_drag = 0.0
+        
+        metrics['Annual Cost Drag'] = annual_cost_drag
         
         metrics_list.append(metrics)
     

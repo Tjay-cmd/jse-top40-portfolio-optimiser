@@ -23,7 +23,7 @@ Which portfolio construction method delivers the best out-of-sample risk-adjuste
 
 ### Universe
 
-JSE Top-40 constituent equities, sourced via yfinance with `.JO` suffix. The configuration lists **34 tickers** after removing duplicates. The backtest uses an **unbalanced panel**: stocks enter the universe once they have sufficient trading history (252 days), allowing the sample to span multiple market regimes rather than truncating to the latest listing date.
+JSE Top-40 constituent equities, sourced via yfinance with `.JO` suffix. The configuration lists **35 tickers** (after restoring BHG.JO as BHP Group). The backtest uses an **unbalanced panel**: stocks enter the universe once they have sufficient trading history (252 days), allowing the sample to span multiple market regimes rather than truncating to the latest listing date.
 
 ### Sample Period
 
@@ -66,6 +66,26 @@ All methods respect:
 
 At each rebalance, only stocks with at least 252 days of trailing returns are eligible for inclusion.
 
+#### Turnover and Cost Measurement
+
+**Turnover** is measured as **one-way turnover**: 
+```
+Turnover = sum(|new_weight - old_weight|) / 2
+```
+
+This represents the fraction of the portfolio that changes. For example, going from 50% A + 50% B to 100% A + 0% B has 50% one-way turnover (you sell 50% and buy 50%).
+
+**Transaction costs** are charged on **both buying and selling**:
+```
+Cost = Turnover × 2 × Cost_per_side × Portfolio_value
+```
+
+With 30bps cost per side and 20% monthly turnover:
+- Monthly cost = 20% × 2 × 0.3% = 0.12% of portfolio
+- Annual cost drag = 0.12% × 12 = 1.44%
+
+**Annual cost drag** is computed as the average cost rate (costs as % of portfolio value) at each rebalance, multiplied by 12. This correctly accounts for portfolio growth over time.
+
 ## Data Cleaning
 
 JSE price series from yfinance exhibit **unit jumps** where mid-series the reported unit switches between cents and rands (or vice versa), producing spurious ~99% single-day moves. For example:
@@ -88,22 +108,24 @@ All metrics annualized, risk-free rate 7% p.a. **Evaluation period: 2010-12-31 t
 
 | **Method**               | **Return** | **Vol** | **Sharpe** | **Deflated Sharpe** | **Max DD** | **Avg Turnover** | **Annual Cost Drag** |
 |--------------------------|------------|---------|------------|---------------------|------------|------------------|----------------------|
-| **Mean-Variance**        | **16.99%** | **22.93%** | **0.435**  | **0.718**           | 40.37%     | 21.71%           | **4.35%**            |
-| Equal Weight             | 10.64%     | 17.67%  | 0.206      | 0.368               | 40.94%     | 3.27%            | 0.29%                |
-| Risk Parity              | 10.34%     | 15.94%  | 0.210      | 0.359               | 41.38%     | 3.50%            | 0.33%                |
-| Black-Litterman          | 9.52%      | 14.71%  | 0.171      | 0.299               | 44.00%     | 4.79%            | 0.43%                |
-| Min Variance (Shrunk)    | 9.23%      | 14.30%  | 0.156      | 0.276               | 44.50%     | 4.77%            | 0.43%                |
-| Min Variance (Sample)    | 9.15%      | 14.32%  | 0.150      | 0.270               | 44.73%     | 4.96%            | 0.45%                |
+| **Mean-Variance**        | **15.88%** | **22.96%** | **0.387**  | **0.660**           | 40.40%     | 21.72%           | **1.57%**            |
+| Equal Weight             | 10.33%     | 17.56%  | 0.189      | 0.345               | 41.08%     | 3.25%            | 0.23%                |
+| Risk Parity              | 9.90%      | 15.88%  | 0.183      | 0.323               | 41.53%     | 3.49%            | 0.25%                |
+| Black-Litterman          | 9.61%      | 14.69%  | 0.178      | 0.307               | 44.20%     | 4.98%            | 0.36%                |
+| Min Variance (Shrunk)    | 9.06%      | 14.27%  | 0.144      | 0.262               | 44.74%     | 5.06%            | 0.36%                |
+| Min Variance (Sample)    | 9.03%      | 14.29%  | 0.142      | 0.259               | 44.98%     | 5.23%            | 0.38%                |
 | **STX40 (Benchmark)**    | **8.34%**  | **17.88%** | **0.075**  | **0.209**           | **37.29%** | **0.00%**        | **0.00%**            |
-| HRP                      | 8.30%      | 15.03%  | 0.086      | 0.203               | 49.43%     | 6.27%            | 0.51%                |
+| HRP                      | 8.18%      | 14.98%  | 0.079      | 0.195               | 49.72%     | 6.25%            | 0.45%                |
+
+**Cost Reconciliation:** For Mean-Variance with 21.72% monthly turnover: Annual cost = 21.72% × 2 (both sides) × 0.3% (per side) × 12 (months) = 1.57% ✓
 
 ### Interpretation
 
-1. **Mean-Variance's DSR of 0.718** is the highest among all strategies, indicating ~72% probability that its true Sharpe ratio exceeds the expected maximum Sharpe from luck alone (not zero) after accounting for testing 7 strategies. This suggests promising performance, though implementation challenges from high volatility and turnover remain. The measured annual cost drag is 4.35% (21.71% turnover × 12 rebalances/year × 30bps ≈ 0.78%/year transaction cost, plus market impact), significantly impacting net returns.
+1. **Mean-Variance's DSR of 0.660** is the highest among all strategies, indicating ~66% probability that its true Sharpe ratio exceeds the expected maximum Sharpe from luck alone (not zero) after accounting for testing 7 strategies. This suggests promising performance, though implementation challenges from high volatility and turnover remain. The measured annual cost drag is **1.57%** (21.72% monthly turnover × 2 sides × 30bps × 12 months), which reconciles correctly with the simple calculation.
 
-2. **Equal Weight, Risk Parity, and Black-Litterman cluster around DSR 0.30-0.37**, suggesting modest statistical significance. Their low cost drag (0.29-0.43% annually) makes them more practical for implementation.
+2. **Equal Weight, Risk Parity, and Black-Litterman cluster around DSR 0.31-0.35**, suggesting modest statistical significance. Their low cost drag (0.23-0.36% annually) makes them more practical for implementation.
 
-3. **HRP's low DSR (0.20)** indicates its 0.086 Sharpe ratio is likely due to chance or overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance.
+3. **HRP's low DSR (0.20)** indicates its 0.079 Sharpe ratio is likely due to chance or overfitting, consistent with López de Prado's warning that complex methods can overfit despite theoretical elegance.
 
 4. **The benchmark's DSR (0.209)** is lower than several active strategies, suggesting these methods add value beyond passive indexing.
 

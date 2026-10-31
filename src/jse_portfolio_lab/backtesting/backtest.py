@@ -96,9 +96,18 @@ class Backtest:
         new_weights: pd.Series
     ) -> float:
         """
-        Compute turnover between two weight vectors.
+        Compute one-way turnover between two weight vectors.
         
-        Turnover = sum(|new_weight - old_weight|) / 2
+        One-way turnover = sum(|new_weight - old_weight|) / 2
+        
+        This represents the fraction of the portfolio that changed.
+        For example, if you go from 50% A + 50% B to 100% A + 0% B:
+        - Changes: +50% A, -50% B
+        - Sum of absolute changes: 100%
+        - One-way turnover: 50%
+        
+        Transaction costs are charged on BOTH the sells and buys,
+        so costs = turnover × 2 × cost_per_side
         """
         # Align indices
         all_tickers = old_weights.index.union(new_weights.index)
@@ -185,7 +194,10 @@ class Backtest:
             turnover_series[rebalance_date] = turnover
             
             # Compute transaction costs
-            tc = turnover * current_value * (self.transaction_cost_bps / 10000)
+            # Transaction costs apply to both buying and selling
+            # One-way turnover represents the portfolio fraction changed
+            # We pay costs on both the sells and the buys (2x turnover)
+            tc = turnover * 2.0 * current_value * (self.transaction_cost_bps / 10000)
             transaction_costs_series[rebalance_date] = tc
             
             # Apply transaction costs

@@ -18,6 +18,7 @@ data:
     - VOD.JO    # Vodacom
     - AMS.JO    # Anglo American Platinum
     - IMP.JO    # Impala Platinum
+    - BHG.JO    # BHP Group
     - REM.JO    # Remgro
     - SLM.JO    # Sanlam
     - GFI.JO    # Gold Fields
