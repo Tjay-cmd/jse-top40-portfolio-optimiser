@@ -18,7 +18,6 @@ data:
     - VOD.JO    # Vodacom
     - AMS.JO    # Anglo American Platinum
     - IMP.JO    # Impala Platinum
-    - BHG.JO    # Bidvest
     - REM.JO    # Remgro
     - SLM.JO    # Sanlam
     - GFI.JO    # Gold Fields
@@ -28,7 +27,7 @@ data:
     - NRP.JO    # Nepi Rockcastle
     - BTI.JO    # British American Tobacco
     - CFR.JO    # Richemont
-    - BVT.JO    # Bidvest
+    - BVT.JO    # The Bidvest Group
     - MRP.JO    # Mr Price
     - TBS.JO    # Tiger Brands
     - APN.JO    # Aspen

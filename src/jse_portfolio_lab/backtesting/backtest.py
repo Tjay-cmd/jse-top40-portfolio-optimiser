@@ -21,6 +21,7 @@ class BacktestResult:
     turnover: pd.Series
     transaction_costs: pd.Series
     returns: pd.Series
+    first_allocation_date: pd.Timestamp  # Date of first portfolio allocation
     
     def to_dict(self) -> Dict:
         """Convert to dictionary for serialization."""
@@ -29,7 +30,8 @@ class BacktestResult:
             'weights_history': self.weights_history,
             'turnover': self.turnover,
             'transaction_costs': self.transaction_costs,
-            'returns': self.returns
+            'returns': self.returns,
+            'first_allocation_date': self.first_allocation_date
         }
 
 
@@ -141,6 +143,8 @@ class Backtest:
         
         portfolio_value.iloc[0] = self.initial_capital
         
+        first_allocation_date = None
+        
         iterator = tqdm(rebalance_dates, desc="Backtesting") if verbose else rebalance_dates
         
         for i, rebalance_date in enumerate(iterator):
@@ -191,6 +195,10 @@ class Backtest:
             current_weights = new_weights
             weights_history.loc[rebalance_date] = new_weights
             
+            # Record first allocation date
+            if first_allocation_date is None and (new_weights > 0).any():
+                first_allocation_date = rebalance_date
+            
             # Compute returns until next rebalance
             if i < len(rebalance_dates) - 1:
                 next_rebalance = rebalance_dates[i + 1]
@@ -236,10 +244,15 @@ class Backtest:
         # Compute portfolio returns
         portfolio_returns = portfolio_value.pct_change().fillna(0)
         
+        # If no allocation was made, use first rebalance date as fallback
+        if first_allocation_date is None and len(rebalance_dates) > 0:
+            first_allocation_date = rebalance_dates[0]
+        
         return BacktestResult(
             portfolio_value=portfolio_value,
             weights_history=weights_history,
             turnover=turnover_series,
             transaction_costs=transaction_costs_series,
-            returns=portfolio_returns
+            returns=portfolio_returns,
+            first_allocation_date=first_allocation_date
         )

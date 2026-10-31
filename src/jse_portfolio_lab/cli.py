@@ -193,24 +193,53 @@ def main(config: str, use_cache: bool, verbose: bool):
     # Number of strategies tested (for Deflated Sharpe Ratio)
     n_trials = len(results)
     
-    # Compute portfolio metrics (benchmark_returns already set from preprocessor)
+    # Determine first allocation date across all strategies
+    first_dates = [res.first_allocation_date for res in results.values() if res.first_allocation_date is not None]
+    if first_dates:
+        evaluation_start_date = max(first_dates)  # Use latest first allocation to ensure all strategies are active
+        if verbose:
+            click.echo(f"\nEvaluation period starts at first allocation: {evaluation_start_date.date()}")
+    else:
+        evaluation_start_date = returns.index[0]
+        if verbose:
+            click.echo(f"\nWarning: No allocation dates found, using full period from {evaluation_start_date.date()}")
+    
+    # Trim returns and benchmark to evaluation period
+    benchmark_returns_eval = benchmark_returns[benchmark_returns.index >= evaluation_start_date]
+    
+    # Compute portfolio metrics
     for method_name, result in results.items():
+        # Trim returns to evaluation period
+        returns_eval = result.returns[result.returns.index >= evaluation_start_date]
+        turnover_eval = result.turnover[result.turnover.index >= evaluation_start_date] if len(result.turnover) > 0 else result.turnover
+        
         metrics = metrics_calc.compute_all_metrics(
-            result.returns,
-            benchmark_returns=benchmark_returns,
-            turnover=result.turnover,
+            returns_eval,
+            benchmark_returns=benchmark_returns_eval,
+            turnover=turnover_eval,
             n_trials=n_trials
         )
         metrics['Method'] = method_name
+        
+        # Compute actual cost drag from backtest
+        total_costs = result.transaction_costs[result.transaction_costs.index >= evaluation_start_date].sum()
+        n_years = len(returns_eval) / 252
+        if n_years > 0:
+            annual_cost_drag = (total_costs / cfg['backtest']['initial_capital']) / n_years
+            metrics['Annual Cost Drag'] = annual_cost_drag
+        else:
+            metrics['Annual Cost Drag'] = 0.0
+        
         metrics_list.append(metrics)
     
-    # Add benchmark metrics (not counted in n_trials as it's not optimized)
+    # Add benchmark metrics
     benchmark_metrics = metrics_calc.compute_all_metrics(
-        benchmark_returns,
+        benchmark_returns_eval,
         n_trials=n_trials
     )
     benchmark_metrics['Method'] = 'STX40 (Benchmark)'
-    benchmark_metrics['Avg Turnover'] = 0.0  # Index doesn't rebalance
+    benchmark_metrics['Avg Turnover'] = 0.0
+    benchmark_metrics['Annual Cost Drag'] = 0.0
     metrics_list.append(benchmark_metrics)
     
     metrics_df = pd.DataFrame(metrics_list).set_index('Method')
@@ -225,6 +254,15 @@ def main(config: str, use_cache: bool, verbose: bool):
     
     # Save metrics table
     metrics_df.to_csv(os.path.join(results_dir, 'metrics.csv'))
+    
+    # Save benchmark data for reproducibility
+    benchmark_df = pd.DataFrame({
+        'Date': benchmark_returns.index,
+        'STX40_Return': benchmark_returns.values
+    })
+    benchmark_df.to_csv(os.path.join(results_dir, 'benchmark_stx40.csv'), index=False)
+    if verbose:
+        click.echo(f"\nSaved benchmark data to {results_dir}/benchmark_stx40.csv")
     
     # Save detailed results
     with open(os.path.join(results_dir, 'backtest_results.pkl'), 'wb') as f:
@@ -244,7 +282,8 @@ def main(config: str, use_cache: bool, verbose: bool):
     
     # Equity curves (reconstruct benchmark portfolio value from returns)
     portfolio_values = {name: res.portfolio_value for name, res in results.items()}
-    benchmark_portfolio_value = (1 + benchmark_returns).cumprod() * cfg['backtest']['initial_capital']
+    # Align benchmark to evaluation period
+    benchmark_portfolio_value = (1 + benchmark_returns_eval).cumprod() * cfg['backtest']['initial_capital']
     viz.plot_equity_curves(portfolio_values, benchmark_portfolio_value, "equity_curves.png")
     
     # Drawdowns
@@ -280,7 +319,8 @@ def main(config: str, use_cache: bool, verbose: bool):
         
         sensitivity_results[cost_bps] = {}
         
-        for method_config in enabled_methods[:3]:  # Test first 3 methods for speed
+        # Run for ALL enabled methods, not just first 3
+        for method_config in enabled_methods:
             method_name = method_config['name']
             
             optimizer = create_optimizer(method_config, cfg['constraints'])
@@ -293,7 +333,9 @@ def main(config: str, use_cache: bool, verbose: bool):
             )
             
             result = backtest.run(returns, prices, verbose=False)
-            sharpe = metrics_calc.sharpe_ratio(result.returns)
+            # Use evaluation period for consistency
+            returns_eval = result.returns[result.returns.index >= evaluation_start_date]
+            sharpe = metrics_calc.sharpe_ratio(returns_eval)
             sensitivity_results[cost_bps][method_name] = sharpe
     
     viz.plot_cost_sensitivity(sensitivity_results, metric='Sharpe Ratio')

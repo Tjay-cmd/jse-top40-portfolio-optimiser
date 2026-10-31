@@ -161,3 +161,44 @@ def test_no_lookahead():
     # This is implicitly tested by using only historical data
     assert len(returns.iloc[:400]) == 400
     assert np.isclose(weights.sum(), 1.0)
+
+
+def test_position_caps_strictly_enforced():
+    """Test that position caps are strictly enforced at rebalancing."""
+    np.random.seed(123)
+    dates = pd.date_range('2020-01-01', periods=500, freq='D')
+    tickers = [f'TICK{i}' for i in range(10)]
+    
+    # Create returns that might lead to concentrated portfolios
+    returns = pd.DataFrame(
+        np.random.randn(500, 10) * 0.02,
+        index=dates,
+        columns=tickers
+    )
+    
+    max_position = 0.15
+    
+    # Test all optimizer types
+    optimizers = [
+        MinVarianceOptimizer(max_position_size=max_position),
+        MeanVarianceOptimizer(max_position_size=max_position),
+        RiskParityOptimizer(max_position_size=max_position),
+        HRPOptimizer(max_position_size=max_position),
+    ]
+    
+    for optimizer in optimizers:
+        weights = optimizer.optimize(returns)
+        
+        # Check sum to 1
+        assert np.isclose(weights.sum(), 1.0, atol=1e-6), \
+            f"{optimizer.__class__.__name__}: weights sum to {weights.sum()}"
+        
+        # Check position caps strictly enforced (tight tolerance)
+        max_weight = weights.max()
+        assert max_weight <= max_position + 1e-6, \
+            f"{optimizer.__class__.__name__}: max weight {max_weight:.6f} exceeds {max_position}"
+        
+        # Verify no single position exceeds cap
+        for ticker in weights.index:
+            assert weights[ticker] <= max_position + 1e-6, \
+                f"{optimizer.__class__.__name__}: {ticker} weight {weights[ticker]:.6f} exceeds {max_position}"
