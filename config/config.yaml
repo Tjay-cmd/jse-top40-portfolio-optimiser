@@ -1,0 +1,141 @@
+# JSE Portfolio Optimiser Lab Configuration
+
+# Data Configuration
+data:
+  # JSE Top-40 liquid constituents (.JO suffix for yfinance)
+  tickers:
+    - NPN.JO    # Naspers
+    - PRX.JO    # Prosus
+    - AGL.JO    # Anglo American
+    - BHP.JO    # BHP Group
+    - SOL.JO    # Sasol
+    - MTN.JO    # MTN Group
+    - SBK.JO    # Standard Bank
+    - FSR.JO    # FirstRand
+    - ABG.JO    # Absa Group
+    - NED.JO    # Nedbank
+    - SHP.JO    # Shoprite
+    - VOD.JO    # Vodacom
+    - AMS.JO    # Anglo American Platinum
+    - IMP.JO    # Impala Platinum
+    - BHG.JO    # Bidvest
+    - REM.JO    # Remgro
+    - SLM.JO    # Sanlam
+    - GFI.JO    # Gold Fields
+    - ANG.JO    # AngloGold Ashanti
+    - CPI.JO    # Capitec
+    - INL.JO    # Investec
+    - NRP.JO    # Nepi Rockcastle
+    - BTI.JO    # British American Tobacco
+    - CFR.JO    # Richemont
+    - BVT.JO    # Bidvest
+    - MRP.JO    # Mr Price
+    - TBS.JO    # Tiger Brands
+    - APN.JO    # Aspen
+    - DSY.JO    # Discovery
+    - OMU.JO    # Old Mutual
+    - SAP.JO    # Sappi
+    - BIL.JO    # BHP Billiton
+    - GLN.JO    # Glencore
+    - KIO.JO    # Kumba Iron Ore
+    - SSW.JO    # Sibanye Stillwater
+  
+  benchmark: STX40.JO  # FTSE/JSE Top 40 Index
+  
+  # Factor data
+  usd_zar: ZAR=X  # USD/ZAR exchange rate
+  sa_10y_yield_fred: IRLTLT01ZAM156N  # SA 10-year government bond yield
+  
+  # Date range
+  start_date: '2015-01-01'
+  end_date: null  # null = today
+  
+  # Data handling
+  min_trading_days: 500  # Minimum trading days required for inclusion
+  price_scale: 100  # JSE prices in cents, divide by 100
+  
+  cache_dir: data/cache
+
+# Backtest Configuration
+backtest:
+  rebalance_frequency: monthly  # monthly rebalancing
+  initial_capital: 1000000  # ZAR 1 million
+  
+  # Transaction costs
+  transaction_cost_bps: 30  # 30 basis points (0.3%)
+  
+  # Walk-forward parameters
+  min_history_days: 252  # Minimum 1 year of history before first allocation
+  expanding_window: true  # Use expanding window (all past data)
+
+# Portfolio Constraints
+constraints:
+  long_only: true
+  max_position_size: 0.15  # Max 15% per stock (Reg 28 inspired)
+  max_sector_size: 0.35  # Max 35% per sector
+  min_position_size: 0.01  # Min 1% to avoid dust positions
+  max_stocks: 30  # Max number of holdings
+
+# Optimization Methods
+methods:
+  - name: equal_weight
+    type: equal_weight
+    enabled: true
+  
+  - name: min_variance
+    type: min_variance
+    enabled: true
+    params:
+      covariance: sample
+  
+  - name: min_variance_shrunk
+    type: min_variance
+    enabled: true
+    params:
+      covariance: ledoit_wolf
+  
+  - name: mean_variance
+    type: mean_variance
+    enabled: true
+    params:
+      objective: max_sharpe
+      covariance: sample
+      return_lookback: 252  # 1 year
+  
+  - name: risk_parity
+    type: risk_parity
+    enabled: true
+    params:
+      covariance: sample
+  
+  - name: hrp
+    type: hrp
+    enabled: true
+    params:
+      covariance: sample
+  
+  - name: black_litterman
+    type: black_litterman
+    enabled: true
+    params:
+      market_cap_weight: true
+      tau: 0.05
+      risk_aversion: 2.5
+
+# Risk-Free Rate
+risk_free_rate: 0.07  # 7% annual (approximate SA rate)
+
+# Performance Metrics
+metrics:
+  confidence_level: 0.95  # For CVaR
+  rolling_vol_window: 21  # Rolling volatility window (days)
+  
+# Reporting
+reporting:
+  output_dir: reports
+  plot_format: png
+  plot_dpi: 150
+  
+# Sensitivity Analysis
+sensitivity:
+  cost_bps_range: [10, 20, 30, 40, 50]  # Test different cost assumptions

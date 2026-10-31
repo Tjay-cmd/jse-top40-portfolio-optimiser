@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Data (except cached data which should be committed for reproducibility)
+data/raw/*.csv
+data/processed/*.csv
+!data/cache/
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+
+# Reports (we'll commit the final ones)
+# reports/*.png will be committed
+# reports/*.html will be committed
